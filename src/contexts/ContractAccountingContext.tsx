@@ -19,8 +19,9 @@ export interface ContractInvoice {
   buyer_verified: boolean;
   seller_verified: boolean;
   sync_status: 'Not Synced' | 'Synced' | 'Sync Failed';
-  payment_status: 'Pending' | 'Partial' | 'Paid';
+  payment_status: 'Pending' | 'Advance Paid' | 'Fully Paid';
   gst_hsn_code?: string;
+  can_sync_to_frappe: boolean; // New field to control sync availability
 }
 
 export interface ContractPayment {
@@ -29,7 +30,7 @@ export interface ContractPayment {
   invoice_id: string;
   contract_id: string;
   amount: number;
-  payment_type: 'Reservation' | 'Final' | 'Partial';
+  payment_type: 'Advance' | 'Final' | 'Partial';
   payment_date: string;
   payment_method: 'Bank Transfer' | 'UPI' | 'Cash' | 'Cheque';
   status: 'Pending' | 'Completed' | 'Failed';
@@ -82,7 +83,7 @@ interface ContractAccountingProviderProps {
 export const ContractAccountingProvider: React.FC<ContractAccountingProviderProps> = ({ children }) => {
   const [toast, setToast] = useState<{ message: string; type: string; show: boolean } | null>(null);
 
-  // Sample contract invoices data
+  // Sample contract invoices data with updated status logic
   const [contractInvoices, setContractInvoices] = useState<ContractInvoice[]>([
     {
       id: '1',
@@ -103,8 +104,9 @@ export const ContractAccountingProvider: React.FC<ContractAccountingProviderProp
       buyer_verified: true,
       seller_verified: true,
       sync_status: 'Synced',
-      payment_status: 'Paid',
-      gst_hsn_code: '7208.51'
+      payment_status: 'Fully Paid',
+      gst_hsn_code: '7208.51',
+      can_sync_to_frappe: true
     },
     {
       id: '2',
@@ -122,11 +124,12 @@ export const ContractAccountingProvider: React.FC<ContractAccountingProviderProp
       status: 'Final',
       created_date: '2025-01-14',
       due_date: '2025-02-14',
-      buyer_verified: true,
+      buyer_verified: false,
       seller_verified: false,
       sync_status: 'Not Synced',
-      payment_status: 'Partial',
-      gst_hsn_code: '7604.10'
+      payment_status: 'Advance Paid',
+      gst_hsn_code: '7604.10',
+      can_sync_to_frappe: false // Cannot sync until verified
     },
     {
       id: '3',
@@ -147,8 +150,9 @@ export const ContractAccountingProvider: React.FC<ContractAccountingProviderProp
       buyer_verified: false,
       seller_verified: false,
       sync_status: 'Not Synced',
-      payment_status: 'Pending',
-      gst_hsn_code: '5201.00'
+      payment_status: 'Advance Paid',
+      gst_hsn_code: '5201.00',
+      can_sync_to_frappe: false // Cannot sync until verified
     }
   ]);
 
@@ -159,7 +163,7 @@ export const ContractAccountingProvider: React.FC<ContractAccountingProviderProp
       invoice_id: '1',
       contract_id: '1',
       amount: 30000,
-      payment_type: 'Reservation',
+      payment_type: 'Advance',
       payment_date: '2025-01-15',
       payment_method: 'Bank Transfer',
       status: 'Completed',
@@ -185,9 +189,22 @@ export const ContractAccountingProvider: React.FC<ContractAccountingProviderProp
       invoice_id: '2',
       contract_id: '2',
       amount: 24000,
-      payment_type: 'Reservation',
+      payment_type: 'Advance',
       payment_date: '2025-01-14',
       payment_method: 'UPI',
+      status: 'Completed',
+      verified_by_buyer: true,
+      verified_by_seller: false
+    },
+    {
+      id: '4',
+      payment_no: 'CP-2025-004',
+      invoice_id: '3',
+      contract_id: '4',
+      amount: 48000,
+      payment_type: 'Advance',
+      payment_date: '2025-01-13',
+      payment_method: 'Bank Transfer',
       status: 'Completed',
       verified_by_buyer: true,
       verified_by_seller: false
@@ -236,12 +253,45 @@ export const ContractAccountingProvider: React.FC<ContractAccountingProviderProp
     }
   ]);
 
+  // Helper function to determine if invoice can sync to Frappe
+  const canSyncToFrappe = (invoice: ContractInvoice): boolean => {
+    return invoice.status === 'Verified' && 
+           invoice.payment_status === 'Fully Paid' && 
+           invoice.buyer_verified && 
+           invoice.seller_verified;
+  };
+
+  // Helper function to auto-add parties if they don't exist
+  const addPartyIfNotExists = (partyName: string, role: 'Buyer' | 'Seller') => {
+    const existingParty = contractParties.find(p => p.company === partyName && p.role === role);
+    if (!existingParty) {
+      const newParty: ContractParty = {
+        id: `party_${Date.now()}_${Math.random()}`,
+        name: partyName,
+        company: partyName,
+        role: role,
+        total_contracts: 1,
+        total_value: 0,
+        verification_score: 85,
+        last_activity: new Date().toISOString().split('T')[0],
+        is_verified: false
+      };
+      setContractParties(prev => [newParty, ...prev]);
+    }
+  };
+
   // Listen for contract events from Contract Module
   useEffect(() => {
     const handleContractReserved = (event: CustomEvent) => {
       const { contractId, invoiceId, contract, quantity, buyerInfo } = event.detail;
       
-      // Create new invoice
+      // Calculate amounts
+      const unitRate = contract.rate_per_unit || (contract.rate / (contract.qty || 1));
+      const totalAmount = quantity * unitRate;
+      const reservationAmount = Math.round(totalAmount * 0.2);
+      const remainingAmount = totalAmount - reservationAmount;
+
+      // Create new invoice with Draft status
       const newInvoice: ContractInvoice = {
         id: invoiceId,
         invoice_no: `CI-2025-${String(contractInvoices.length + 1).padStart(3, '0')}`,
@@ -251,30 +301,31 @@ export const ContractAccountingProvider: React.FC<ContractAccountingProviderProp
         seller: contract.posted_by,
         item_name: contract.item_name,
         quantity: quantity,
-        rate: contract.rate_per_unit || (contract.rate / (contract.qty || 1)),
-        total_amount: quantity * (contract.rate_per_unit || (contract.rate / (contract.qty || 1))),
-        reservation_amount: Math.round(quantity * (contract.rate_per_unit || (contract.rate / (contract.qty || 1))) * 0.2),
-        remaining_amount: Math.round(quantity * (contract.rate_per_unit || (contract.rate / (contract.qty || 1))) * 0.8),
-        status: 'Draft',
+        rate: unitRate,
+        total_amount: totalAmount,
+        reservation_amount: reservationAmount,
+        remaining_amount: remainingAmount,
+        status: 'Draft', // Always start as Draft
         created_date: new Date().toISOString().split('T')[0],
         due_date: contract.availability_date || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
         buyer_verified: false,
         seller_verified: false,
         sync_status: 'Not Synced',
-        payment_status: 'Pending',
-        gst_hsn_code: contract.gst_hsn_code
+        payment_status: 'Advance Paid', // 20% paid immediately
+        gst_hsn_code: contract.gst_hsn_code,
+        can_sync_to_frappe: false // Cannot sync until verified
       };
 
       setContractInvoices(prev => [newInvoice, ...prev]);
 
-      // Create reservation payment
-      const reservationPayment: ContractPayment = {
+      // Create advance payment record
+      const advancePayment: ContractPayment = {
         id: `payment_${Date.now()}`,
         payment_no: `CP-2025-${String(contractPayments.length + 1).padStart(3, '0')}`,
         invoice_id: invoiceId,
         contract_id: contractId,
-        amount: newInvoice.reservation_amount,
-        payment_type: 'Reservation',
+        amount: reservationAmount,
+        payment_type: 'Advance',
         payment_date: new Date().toISOString().split('T')[0],
         payment_method: 'Bank Transfer',
         status: 'Completed',
@@ -282,34 +333,28 @@ export const ContractAccountingProvider: React.FC<ContractAccountingProviderProp
         verified_by_seller: false
       };
 
-      setContractPayments(prev => [reservationPayment, ...prev]);
+      setContractPayments(prev => [advancePayment, ...prev]);
 
-      // Add parties if they don't exist
-      const buyerExists = contractParties.find(p => p.company === buyerInfo.company);
-      if (!buyerExists) {
-        const newBuyer: ContractParty = {
-          id: `buyer_${Date.now()}`,
-          name: buyerInfo.name,
-          company: buyerInfo.company,
-          role: 'Buyer',
-          total_contracts: 1,
-          total_value: newInvoice.total_amount,
-          verification_score: 85,
-          last_activity: new Date().toISOString().split('T')[0],
-          is_verified: false
-        };
-        setContractParties(prev => [newBuyer, ...prev]);
-      }
+      // Auto-add parties to the system
+      addPartyIfNotExists(buyerInfo.company || buyerInfo.name, 'Buyer');
+      addPartyIfNotExists(contract.posted_by, 'Seller');
 
-      showToast('Contract invoice generated successfully!', 'success');
+      showToast('Contract reserved! Draft invoice generated with advance payment recorded.', 'success');
     };
 
     const handleContractReadyForDelivery = (event: CustomEvent) => {
       const { invoiceId } = event.detail;
-      setContractInvoices(prev => prev.map(invoice => 
-        invoice.id === invoiceId ? { ...invoice, status: 'Final' } : invoice
-      ));
-      showToast('Invoice status updated to Final - ready for delivery!', 'info');
+      setContractInvoices(prev => prev.map(invoice => {
+        if (invoice.id === invoiceId) {
+          return {
+            ...invoice,
+            status: 'Final',
+            can_sync_to_frappe: false // Still cannot sync until verified
+          };
+        }
+        return invoice;
+      }));
+      showToast('Invoice status updated to Final - ready for delivery verification!', 'info');
     };
 
     const handleContractVerified = (event: CustomEvent) => {
@@ -323,12 +368,19 @@ export const ContractAccountingProvider: React.FC<ContractAccountingProviderProp
           
           if (fullyVerified) {
             updated.status = 'Verified';
+            updated.can_sync_to_frappe = canSyncToFrappe(updated);
           }
           
           return updated;
         }
         return invoice;
       }));
+
+      if (fullyVerified) {
+        showToast('Contract fully verified! Invoice can now be synced to Frappe Books.', 'success');
+      } else {
+        showToast(`Contract execution verified by ${role}. Waiting for other party verification.`, 'info');
+      }
     };
 
     window.addEventListener('contractReserved', handleContractReserved as EventListener);
@@ -347,7 +399,8 @@ export const ContractAccountingProvider: React.FC<ContractAccountingProviderProp
     const newInvoice: ContractInvoice = {
       ...invoiceData,
       id: invoiceId,
-      invoice_no: `CI-2025-${String(contractInvoices.length + 1).padStart(3, '0')}`
+      invoice_no: `CI-2025-${String(contractInvoices.length + 1).padStart(3, '0')}`,
+      can_sync_to_frappe: canSyncToFrappe(invoiceData as ContractInvoice)
     };
 
     setContractInvoices(prev => [newInvoice, ...prev]);
@@ -356,9 +409,14 @@ export const ContractAccountingProvider: React.FC<ContractAccountingProviderProp
   };
 
   const updateInvoiceStatus = (id: string, status: string) => {
-    setContractInvoices(prev => prev.map(invoice => 
-      invoice.id === id ? { ...invoice, status: status as any } : invoice
-    ));
+    setContractInvoices(prev => prev.map(invoice => {
+      if (invoice.id === id) {
+        const updated = { ...invoice, status: status as any };
+        updated.can_sync_to_frappe = canSyncToFrappe(updated);
+        return updated;
+      }
+      return invoice;
+    }));
     showToast(`Invoice status updated to ${status}`, 'success');
   };
 
@@ -373,6 +431,7 @@ export const ContractAccountingProvider: React.FC<ContractAccountingProviderProp
         // If both parties have verified, update status to Verified
         if (updated.buyer_verified && updated.seller_verified) {
           updated.status = 'Verified';
+          updated.can_sync_to_frappe = canSyncToFrappe(updated);
         }
         
         return updated;
@@ -380,12 +439,27 @@ export const ContractAccountingProvider: React.FC<ContractAccountingProviderProp
       return invoice;
     }));
     
-    showToast(`Contract execution verified by ${role}`, 'success');
+    const invoice = contractInvoices.find(inv => inv.id === invoiceId);
+    const fullyVerified = invoice && 
+      ((role === 'buyer' && invoice.seller_verified) || 
+       (role === 'seller' && invoice.buyer_verified));
+    
+    if (fullyVerified) {
+      showToast('Contract fully verified! Invoice can now be synced to Frappe Books.', 'success');
+    } else {
+      showToast(`Contract execution verified by ${role}. Waiting for other party verification.`, 'info');
+    }
   };
 
   const syncToERP = async (invoiceId: string) => {
     const invoice = contractInvoices.find(inv => inv.id === invoiceId);
     if (!invoice) return;
+
+    // Check if invoice can be synced
+    if (!invoice.can_sync_to_frappe) {
+      showToast('Invoice cannot be synced. Ensure it is verified and fully paid.', 'error');
+      return;
+    }
 
     try {
       // Simulate API call to ERP system
@@ -398,18 +472,18 @@ export const ContractAccountingProvider: React.FC<ContractAccountingProviderProp
         setContractInvoices(prev => prev.map(inv => 
           inv.id === invoiceId ? { ...inv, sync_status: 'Synced' } : inv
         ));
-        showToast(`Invoice ${invoice.invoice_no} synced to ERP successfully!`, 'success');
+        showToast(`Invoice ${invoice.invoice_no} synced to Frappe Books successfully!`, 'success');
       } else {
         setContractInvoices(prev => prev.map(inv => 
           inv.id === invoiceId ? { ...inv, sync_status: 'Sync Failed' } : inv
         ));
-        showToast(`Failed to sync ${invoice.invoice_no} to ERP. Please try again.`, 'error');
+        showToast(`Failed to sync ${invoice.invoice_no} to Frappe Books. Please try again.`, 'error');
       }
     } catch (error) {
       setContractInvoices(prev => prev.map(inv => 
         inv.id === invoiceId ? { ...inv, sync_status: 'Sync Failed' } : inv
       ));
-      showToast('ERP sync failed due to network error. Please try again.', 'error');
+      showToast('Frappe Books sync failed due to network error. Please try again.', 'error');
     }
   };
 
@@ -429,12 +503,17 @@ export const ContractAccountingProvider: React.FC<ContractAccountingProviderProp
         .filter(p => p.invoice_id === paymentData.invoice_id && p.status === 'Completed')
         .reduce((sum, p) => sum + p.amount, 0) + paymentData.amount;
       
-      const paymentStatus = totalPaid >= invoice.total_amount ? 'Paid' : 
-                           totalPaid > 0 ? 'Partial' : 'Pending';
+      const paymentStatus = totalPaid >= invoice.total_amount ? 'Fully Paid' : 
+                           totalPaid > 0 ? 'Advance Paid' : 'Pending';
       
-      setContractInvoices(prev => prev.map(inv => 
-        inv.id === paymentData.invoice_id ? { ...inv, payment_status: paymentStatus as any } : inv
-      ));
+      setContractInvoices(prev => prev.map(inv => {
+        if (inv.id === paymentData.invoice_id) {
+          const updated = { ...inv, payment_status: paymentStatus as any };
+          updated.can_sync_to_frappe = canSyncToFrappe(updated);
+          return updated;
+        }
+        return inv;
+      }));
     }
 
     showToast('Payment recorded successfully!', 'success');

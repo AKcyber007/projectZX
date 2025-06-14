@@ -3,7 +3,7 @@ import { useContracts } from '../contexts/ContractContext';
 import ContractCard from '../components/ContractCard';
 import ContractProgressBar from '../components/ContractProgressBar';
 import SplitReserveModal from '../components/SplitReserveModal';
-import { Search, Filter, SlidersHorizontal, Crown, Calendar, Users, Plus, CheckCircle, XCircle } from 'lucide-react';
+import { Search, Filter, SlidersHorizontal, Crown, Calendar, Users, Plus, CheckCircle, XCircle, Clock, Package } from 'lucide-react';
 import { useUser } from '../contexts/UserContext';
 import { useNavigate } from 'react-router-dom';
 
@@ -141,6 +141,45 @@ const ContractMarketplacePage: React.FC = () => {
     }
   };
 
+  const getExecutionStatusBadge = (contract: any) => {
+    if (!contract.execution_status || contract.execution_status === 'pending') {
+      return { color: 'bg-gray-100 text-gray-800', text: 'Pending', icon: Clock };
+    }
+    
+    switch (contract.execution_status) {
+      case 'ready_for_delivery':
+        return { color: 'bg-blue-100 text-blue-800', text: 'Ready for Delivery', icon: Package };
+      case 'delivered':
+        return { color: 'bg-purple-100 text-purple-800', text: 'Delivered', icon: CheckCircle };
+      case 'completed':
+        return { color: 'bg-green-100 text-green-800', text: 'Completed', icon: CheckCircle };
+      default:
+        return { color: 'bg-gray-100 text-gray-800', text: 'Pending', icon: Clock };
+    }
+  };
+
+  const getInvoiceStatusBadge = (contract: any) => {
+    if (!contract.invoice_generated) {
+      return null;
+    }
+
+    // Determine invoice status based on verification
+    let status = 'Draft';
+    let color = 'bg-gray-100 text-gray-800';
+
+    if (contract.execution_status === 'ready_for_delivery') {
+      status = 'Final';
+      color = 'bg-blue-100 text-blue-800';
+    }
+
+    if (contract.buyer_verified && contract.seller_verified) {
+      status = 'Verified';
+      color = 'bg-green-100 text-green-800';
+    }
+
+    return { color, text: `Invoice: ${status}` };
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
@@ -262,6 +301,8 @@ const ContractMarketplacePage: React.FC = () => {
                 const userReservation = getUserReservation(contract.id);
                 const hasReserved = hasUserReserved(contract.id);
                 const canViewInvoice = hasReserved && contract.invoice_generated && userReservation?.invoice_id;
+                const executionStatus = getExecutionStatusBadge(contract);
+                const invoiceStatus = getInvoiceStatusBadge(contract);
 
                 return (
                   <div key={contract.id} className="relative">
@@ -309,7 +350,6 @@ const ContractMarketplacePage: React.FC = () => {
                           <div className="flex items-center space-x-4 text-sm text-gray-500 mt-1">
                             <span>Customer: {contract.customer}</span>
                             <span>Posted: {contract.posted_date}</span>
-                            <span>Status: {contract.execution_status}</span>
                           </div>
                         </div>
                       </div>
@@ -367,6 +407,7 @@ const ContractMarketplacePage: React.FC = () => {
                       {/* Contract Footer */}
                       <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-3">
+                          {/* Document Status */}
                           <div className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(contract.docstatus)}`}>
                             {getStatusText(contract.docstatus)}
                           </div>
@@ -381,14 +422,35 @@ const ContractMarketplacePage: React.FC = () => {
                           </div>
 
                           {/* Execution Status */}
-                          <div className={`px-2 py-1 rounded-full text-xs font-medium ${
-                            contract.execution_status === 'completed' ? 'bg-green-100 text-green-800' :
-                            contract.execution_status === 'ready_for_delivery' ? 'bg-blue-100 text-blue-800' :
-                            contract.execution_status === 'delivered' ? 'bg-purple-100 text-purple-800' :
-                            'bg-gray-100 text-gray-800'
-                          }`}>
-                            {contract.execution_status?.replace('_', ' ') || 'pending'}
+                          <div className={`flex items-center space-x-1 px-2 py-1 rounded-full text-xs font-medium ${executionStatus.color}`}>
+                            <executionStatus.icon className="w-3 h-3" />
+                            <span>{executionStatus.text}</span>
                           </div>
+
+                          {/* Invoice Status */}
+                          {invoiceStatus && (
+                            <div className={`px-2 py-1 rounded-full text-xs font-medium ${invoiceStatus.color}`}>
+                              {invoiceStatus.text}
+                            </div>
+                          )}
+
+                          {/* Verification Status */}
+                          {contract.invoice_generated && (
+                            <div className="flex items-center space-x-1">
+                              <div className={`flex items-center space-x-1 px-2 py-1 rounded-full text-xs font-medium ${
+                                contract.buyer_verified ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                              }`}>
+                                {contract.buyer_verified ? <CheckCircle className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
+                                <span>Buyer</span>
+                              </div>
+                              <div className={`flex items-center space-x-1 px-2 py-1 rounded-full text-xs font-medium ${
+                                contract.seller_verified ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                              }`}>
+                                {contract.seller_verified ? <CheckCircle className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
+                                <span>Seller</span>
+                              </div>
+                            </div>
+                          )}
                         </div>
                         
                         <div className="flex items-center space-x-3">
