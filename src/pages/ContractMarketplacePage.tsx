@@ -3,19 +3,23 @@ import { useContracts } from '../contexts/ContractContext';
 import ContractCard from '../components/ContractCard';
 import ContractProgressBar from '../components/ContractProgressBar';
 import SplitReserveModal from '../components/SplitReserveModal';
-import { Search, Filter, SlidersHorizontal, Crown, Calendar, Users, Plus, CheckCircle, XCircle, Clock, Package } from 'lucide-react';
+import { Search, Filter, SlidersHorizontal, Crown, Calendar, Users, Plus, CheckCircle, XCircle, Clock, Package, ShoppingBag, ShoppingCart, AlertCircle } from 'lucide-react';
 import { useUser } from '../contexts/UserContext';
 import { useNavigate } from 'react-router-dom';
 
 const ContractMarketplacePage: React.FC = () => {
   const navigate = useNavigate();
-  const { isPremium } = useUser();
+  const { isPremium, user } = useUser();
   const { contracts, updateContract, reserveContract, hasUserReserved, getUserReservation, cancelReservation } = useContracts();
   const [activeFilter, setActiveFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedContract, setSelectedContract] = useState<any>(null);
   const [showSplitModal, setShowSplitModal] = useState(false);
   const [reservingContract, setReservingContract] = useState<string | null>(null);
+
+  // Current user identifier - in a real app, this would come from authentication
+  const currentUserId = 'current_user';
+  const currentUserName = user.name || 'You';
 
   const filters = [
     { id: 'all', label: 'All Contracts', count: contracts.length },
@@ -42,8 +46,76 @@ const ContractMarketplacePage: React.FC = () => {
     return matchesFilter && matchesSearch;
   });
 
+  // Helper function to check if current user is the contract owner
+  const isOwnContract = (contract: any) => {
+    return contract.posted_by === currentUserName || contract.posted_by === 'You';
+  };
+
+  // Helper function to get the appropriate action button text
+  const getActionButtonText = (contract: any) => {
+    if (contract.contract_type === 'Future' || contract.allow_partial_purchases) {
+      return 'Reserve Contract';
+    }
+    if (contract.contract_type === 'Sell') {
+      return 'Buy Now';
+    }
+    if (contract.contract_type === 'Buy') {
+      return 'Sell to Buyer';
+    }
+    if (contract.contract_type === 'Service') {
+      return 'Apply for Service';
+    }
+    return 'Reserve Contract';
+  };
+
+  // Helper function to get contract type tag
+  const getContractTypeTag = (contract: any) => {
+    const baseClasses = "px-2 py-1 text-xs font-medium rounded-full";
+    
+    switch (contract.contract_type) {
+      case 'Sell':
+        return {
+          text: 'Selling',
+          className: `${baseClasses} bg-green-100 text-green-800`,
+          icon: ShoppingBag
+        };
+      case 'Buy':
+        return {
+          text: 'Buying',
+          className: `${baseClasses} bg-blue-100 text-blue-800`,
+          icon: ShoppingCart
+        };
+      case 'Service':
+        return {
+          text: 'Service',
+          className: `${baseClasses} bg-purple-100 text-purple-800`,
+          icon: Package
+        };
+      case 'Future':
+        return {
+          text: 'Future',
+          className: `${baseClasses} bg-orange-100 text-orange-800`,
+          icon: Calendar
+        };
+      default:
+        return {
+          text: contract.contract_type,
+          className: `${baseClasses} bg-gray-100 text-gray-800`,
+          icon: Package
+        };
+    }
+  };
+
   const handleReserveContract = async (contractId: string) => {
-    if (!isPremium && contracts.find(c => c.id === contractId)?.contract_type === 'Future') {
+    const contract = contracts.find(c => c.id === contractId);
+    if (!contract) return;
+
+    // Prevent self-reservation
+    if (isOwnContract(contract)) {
+      return;
+    }
+
+    if (!isPremium && contract.contract_type === 'Future') {
       navigate('/subscription');
       return;
     }
@@ -51,12 +123,9 @@ const ContractMarketplacePage: React.FC = () => {
     setReservingContract(contractId);
     
     try {
-      const contract = contracts.find(c => c.id === contractId);
-      if (!contract) return;
-
       await reserveContract(contractId, contract.qty, {
-        name: 'John Doe',
-        company: 'Your Company Ltd'
+        name: currentUserName,
+        company: user.company
       });
 
       // Navigate to contract accounting to see the generated invoice
@@ -71,6 +140,11 @@ const ContractMarketplacePage: React.FC = () => {
   };
 
   const handleSplitReserve = (contract: any) => {
+    // Prevent self-reservation
+    if (isOwnContract(contract)) {
+      return;
+    }
+
     if (!isPremium) {
       navigate('/subscription');
       return;
@@ -98,8 +172,8 @@ const ContractMarketplacePage: React.FC = () => {
     
     try {
       await reserveContract(selectedContract.id, quantity, {
-        name: 'John Doe',
-        company: 'Your Company Ltd'
+        name: currentUserName,
+        company: user.company
       });
 
       // Update the contract with new reservation
@@ -303,6 +377,9 @@ const ContractMarketplacePage: React.FC = () => {
                 const canViewInvoice = hasReserved && contract.invoice_generated && userReservation?.invoice_id;
                 const executionStatus = getExecutionStatusBadge(contract);
                 const invoiceStatus = getInvoiceStatusBadge(contract);
+                const isOwn = isOwnContract(contract);
+                const contractTypeTag = getContractTypeTag(contract);
+                const actionButtonText = getActionButtonText(contract);
 
                 return (
                   <div key={contract.id} className="relative">
@@ -313,12 +390,12 @@ const ContractMarketplacePage: React.FC = () => {
                           <div className="flex items-center space-x-2 mb-2">
                             <h3 className="text-lg font-semibold text-gray-900">{contract.item_name}</h3>
                             <div className="flex items-center space-x-1">
-                              {contract.contract_type === 'Future' && (
-                                <div className="flex items-center space-x-1 bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs font-medium">
-                                  <Calendar className="w-3 h-3" />
-                                  <span>Future</span>
-                                </div>
-                              )}
+                              {/* Contract Type Tag */}
+                              <div className={`flex items-center space-x-1 ${contractTypeTag.className}`}>
+                                <contractTypeTag.icon className="w-3 h-3" />
+                                <span>{contractTypeTag.text}</span>
+                              </div>
+
                               {contract.allow_partial_purchases && (
                                 <div className="flex items-center space-x-1 bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-medium">
                                   <Users className="w-3 h-3" />
@@ -334,6 +411,12 @@ const ContractMarketplacePage: React.FC = () => {
                                 <div className="flex items-center space-x-1 bg-purple-100 text-purple-800 px-2 py-1 rounded-full text-xs font-medium">
                                   <CheckCircle className="w-3 h-3" />
                                   <span>You Reserved</span>
+                                </div>
+                              )}
+                              {isOwn && (
+                                <div className="flex items-center space-x-1 bg-gray-100 text-gray-800 px-2 py-1 rounded-full text-xs font-medium">
+                                  <Package className="w-3 h-3" />
+                                  <span>Your Contract</span>
                                 </div>
                               )}
                             </div>
@@ -454,9 +537,16 @@ const ContractMarketplacePage: React.FC = () => {
                         </div>
                         
                         <div className="flex items-center space-x-3">
-                          {/* Action Buttons */}
-                          {!hasReserved ? (
-                            // Show reservation buttons only if user hasn't reserved
+                          {/* Self-Contract Warning */}
+                          {isOwn && !hasReserved && (
+                            <div className="flex items-center space-x-2 text-xs text-gray-500 bg-gray-50 px-3 py-2 rounded-lg">
+                              <AlertCircle className="w-4 h-4" />
+                              <span>You can't buy your own contract</span>
+                            </div>
+                          )}
+
+                          {/* Action Buttons - Only show if not own contract */}
+                          {!isOwn && !hasReserved && (
                             contract.allow_partial_purchases ? (
                               <button
                                 onClick={() => handleSplitReserve(contract)}
@@ -469,7 +559,7 @@ const ContractMarketplacePage: React.FC = () => {
                                     : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                                 }`}
                               >
-                                {reservingContract === contract.id ? 'Reserving...' : 'Reserve Part'}
+                                {reservingContract === contract.id ? 'Reserving...' : actionButtonText}
                               </button>
                             ) : contract.contract_type === 'Future' ? (
                               <button
@@ -483,7 +573,7 @@ const ContractMarketplacePage: React.FC = () => {
                                     : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                                 }`}
                               >
-                                {reservingContract === contract.id ? 'Reserving...' : 'Reserve Now'}
+                                {reservingContract === contract.id ? 'Processing...' : actionButtonText}
                               </button>
                             ) : (
                               <button
@@ -492,14 +582,20 @@ const ContractMarketplacePage: React.FC = () => {
                                 className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
                                   reservingContract === contract.id
                                     ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                    : contract.contract_type === 'Sell'
+                                    ? 'bg-green-600 hover:bg-green-700 text-white'
+                                    : contract.contract_type === 'Buy'
+                                    ? 'bg-blue-600 hover:bg-blue-700 text-white'
                                     : 'bg-gray-600 hover:bg-gray-700 text-white'
                                 }`}
                               >
-                                {reservingContract === contract.id ? 'Processing...' : 'Reserve Contract'}
+                                {reservingContract === contract.id ? 'Processing...' : actionButtonText}
                               </button>
                             )
-                          ) : (
-                            // Show status for reserved contracts
+                          )}
+
+                          {/* Show status for reserved contracts */}
+                          {!isOwn && hasReserved && (
                             <div className="flex items-center space-x-1 text-xs text-green-600">
                               <CheckCircle className="w-3 h-3" />
                               <span>Reserved</span>
