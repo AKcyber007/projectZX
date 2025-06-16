@@ -2,16 +2,15 @@ import React, { useState } from 'react';
 import ContractCard from '../components/ContractCard';
 import ContractProgressBar from '../components/ContractProgressBar';
 import ParticipantList from '../components/ParticipantList';
-import { Filter, Download, MoreHorizontal, Calendar, Crown, AlertCircle, Users, ChevronDown, ChevronUp, RefreshCw, CheckCircle, XCircle, Truck, Package } from 'lucide-react';
+import { Filter, Download, MoreHorizontal, Calendar, Crown, AlertCircle, Users, ChevronDown, ChevronUp, CheckCircle, XCircle, Truck, Package } from 'lucide-react';
 import { useUser } from '../contexts/UserContext';
 import { useContracts } from '../contexts/ContractContext';
 
 const MyContractsPage: React.FC = () => {
   const { isPremium } = useUser();
-  const { contracts, syncToFrappeBooks, markContractReadyForDelivery, verifyContractExecution } = useContracts();
+  const { contracts, markContractReadyForDelivery, verifyContractExecution } = useContracts();
   const [activeTab, setActiveTab] = useState('all');
   const [expandedContracts, setExpandedContracts] = useState<Set<string>>(new Set());
-  const [syncingContracts, setSyncingContracts] = useState<Set<string>>(new Set());
 
   const tabs = [
     { id: 'all', label: 'All Contracts', count: contracts.length },
@@ -80,16 +79,6 @@ const MyContractsPage: React.FC = () => {
     });
   };
 
-  const handleSyncToFrappe = async (contractId: string) => {
-    setSyncingContracts(prev => new Set(prev).add(contractId));
-    await syncToFrappeBooks(contractId);
-    setSyncingContracts(prev => {
-      const newSet = new Set(prev);
-      newSet.delete(contractId);
-      return newSet;
-    });
-  };
-
   const handleMarkReadyForDelivery = (contractId: string) => {
     markContractReadyForDelivery(contractId);
   };
@@ -129,7 +118,7 @@ const MyContractsPage: React.FC = () => {
     switch (syncStatus) {
       case 'Synced': return CheckCircle;
       case 'Sync Failed': return XCircle;
-      default: return RefreshCw;
+      default: return Package;
     }
   };
 
@@ -385,31 +374,6 @@ const MyContractsPage: React.FC = () => {
                               </button>
                             )}
                           </>
-                        )}
-
-                        {/* Sync to Frappe Button */}
-                        {contract.sync_status !== 'Synced' && (
-                          <button
-                            onClick={() => handleSyncToFrappe(contract.id)}
-                            disabled={syncingContracts.has(contract.id)}
-                            className={`flex items-center space-x-2 px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
-                              syncingContracts.has(contract.id)
-                                ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                                : 'bg-blue-600 hover:bg-blue-700 text-white'
-                            }`}
-                          >
-                            {syncingContracts.has(contract.id) ? (
-                              <>
-                                <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
-                                <span>Syncing...</span>
-                              </>
-                            ) : (
-                              <>
-                                <RefreshCw className="w-3 h-3" />
-                                <span>Sync to Frappe</span>
-                              </>
-                            )}
-                          </button>
                         )}
 
                         {/* View Invoice Button */}

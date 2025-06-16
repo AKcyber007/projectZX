@@ -65,7 +65,10 @@ const ContractInvoices: React.FC = () => {
 
   const handleSyncToERP = async (invoiceId: string) => {
     const invoice = contractInvoices.find(inv => inv.id === invoiceId);
-    if (!invoice?.can_sync_to_frappe) {
+    if (!invoice) return;
+
+    // Check if invoice meets sync requirements
+    if (!canSyncToFrappe(invoice)) {
       return;
     }
 
@@ -78,13 +81,22 @@ const ContractInvoices: React.FC = () => {
     });
   };
 
+  // Helper function to determine if invoice can sync to Frappe
+  const canSyncToFrappe = (invoice: any): boolean => {
+    return invoice.status === 'Verified' && 
+           invoice.payment_status === 'Fully Paid' && 
+           invoice.buyer_verified && 
+           invoice.seller_verified;
+  };
+
   const getSyncButtonState = (invoice: any) => {
-    if (!invoice.can_sync_to_frappe) {
+    if (!canSyncToFrappe(invoice)) {
       return {
         disabled: true,
         text: 'Sync Locked',
         icon: Lock,
-        tooltip: 'Invoice must be verified and fully paid before syncing to Frappe Books'
+        tooltip: 'Invoice must be verified by both parties and fully paid before syncing to Frappe Books',
+        className: 'bg-gray-300 text-gray-500 cursor-not-allowed'
       };
     }
     
@@ -93,7 +105,8 @@ const ContractInvoices: React.FC = () => {
         disabled: true,
         text: 'Synced',
         icon: CheckCircle,
-        tooltip: 'Already synced to Frappe Books'
+        tooltip: 'Already synced to Frappe Books',
+        className: 'bg-green-100 text-green-800 cursor-not-allowed'
       };
     }
 
@@ -102,7 +115,18 @@ const ContractInvoices: React.FC = () => {
         disabled: true,
         text: 'Syncing...',
         icon: RefreshCw,
-        tooltip: 'Sync in progress'
+        tooltip: 'Sync in progress',
+        className: 'bg-blue-300 text-blue-700 cursor-not-allowed'
+      };
+    }
+
+    if (invoice.sync_status === 'Sync Failed') {
+      return {
+        disabled: false,
+        text: 'Retry Sync',
+        icon: RefreshCw,
+        tooltip: 'Previous sync failed. Click to retry syncing to Frappe Books',
+        className: 'bg-red-600 hover:bg-red-700 text-white'
       };
     }
 
@@ -110,7 +134,8 @@ const ContractInvoices: React.FC = () => {
       disabled: false,
       text: 'Sync to Frappe',
       icon: RefreshCw,
-      tooltip: 'Sync verified invoice to Frappe Books'
+      tooltip: 'Sync verified invoice to Frappe Books',
+      className: 'bg-purple-600 hover:bg-purple-700 text-white'
     };
   };
 
@@ -130,8 +155,8 @@ const ContractInvoices: React.FC = () => {
 
       {/* Status Flow Explanation */}
       <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
-        <h3 className="text-lg font-semibold text-blue-800 mb-3">Invoice Status Flow</h3>
-        <div className="flex items-center space-x-4 text-sm">
+        <h3 className="text-lg font-semibold text-blue-800 mb-3">Invoice Status Flow & Frappe Sync Requirements</h3>
+        <div className="flex items-center space-x-4 text-sm mb-4">
           <div className="flex items-center space-x-2">
             <div className="w-3 h-3 bg-gray-400 rounded-full"></div>
             <span className="text-gray-700">Draft</span>
@@ -154,6 +179,15 @@ const ContractInvoices: React.FC = () => {
             <RefreshCw className="w-3 h-3 text-purple-600" />
             <span className="text-gray-700">Frappe Sync</span>
             <span className="text-gray-500">(ERP integration)</span>
+          </div>
+        </div>
+        <div className="bg-purple-50 border border-purple-200 rounded-lg p-3">
+          <div className="flex items-start space-x-2">
+            <Lock className="w-4 h-4 text-purple-600 mt-0.5" />
+            <div className="text-sm text-purple-700">
+              <strong>Frappe Sync Requirements:</strong> Invoices can only be synced after they are <strong>Verified</strong> by both buyer and seller, 
+              and payment is <strong>Fully Paid</strong>. This ensures data integrity and prevents premature ERP integration.
+            </div>
           </div>
         </div>
       </div>
@@ -223,9 +257,9 @@ const ContractInvoices: React.FC = () => {
         </div>
         <div className="bg-white rounded-lg border border-gray-200 p-4">
           <div className="text-2xl font-bold text-yellow-600">
-            {contractInvoices.filter(inv => !inv.can_sync_to_frappe && inv.status !== 'Cancelled').length}
+            {contractInvoices.filter(inv => canSyncToFrappe(inv) && inv.sync_status !== 'Synced').length}
           </div>
-          <div className="text-sm text-gray-600">Pending Verification</div>
+          <div className="text-sm text-gray-600">Ready to Sync</div>
         </div>
       </div>
 
@@ -346,20 +380,16 @@ const ContractInvoices: React.FC = () => {
                           </button>
                         )}
 
-                        {/* Sync Button */}
+                        {/* Sync Button - Only show if requirements are met or already synced/failed */}
                         <div className="relative group">
                           <button
                             onClick={() => handleSyncToERP(invoice.id)}
                             disabled={syncButton.disabled}
-                            className={`flex items-center space-x-1 text-xs px-2 py-1 rounded transition-colors ${
-                              syncButton.disabled
-                                ? 'text-gray-400 bg-gray-100 cursor-not-allowed'
-                                : 'text-purple-600 hover:text-purple-900 bg-purple-50 hover:bg-purple-100'
-                            }`}
+                            className={`flex items-center space-x-1 text-xs px-2 py-1 rounded transition-colors ${syncButton.className}`}
                             title={syncButton.tooltip}
                           >
                             {syncButton.text === 'Syncing...' ? (
-                              <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-purple-600"></div>
+                              <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-current"></div>
                             ) : (
                               <syncButton.icon className="w-3 h-3" />
                             )}
@@ -367,11 +397,9 @@ const ContractInvoices: React.FC = () => {
                           </button>
                           
                           {/* Tooltip */}
-                          {syncButton.disabled && (
-                            <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 text-xs text-white bg-gray-800 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
-                              {syncButton.tooltip}
-                            </div>
-                          )}
+                          <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 text-xs text-white bg-gray-800 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10 pointer-events-none">
+                            {syncButton.tooltip}
+                          </div>
                         </div>
 
                         <button className="text-gray-600 hover:text-gray-900">
@@ -411,6 +439,13 @@ const ContractInvoices: React.FC = () => {
               Invoices can only be synced to Frappe Books after they are <strong>Verified</strong> by both buyer and seller, 
               and payment is <strong>Fully Paid</strong>. This ensures data integrity and prevents premature ERP integration.
             </p>
+            <div className="mt-2 text-xs text-yellow-600">
+              <strong>Sync Status Legend:</strong>
+              <span className="ml-2">🔒 Locked (Requirements not met)</span>
+              <span className="ml-2">✅ Synced (Successfully synced)</span>
+              <span className="ml-2">🔄 Ready (Can sync now)</span>
+              <span className="ml-2">❌ Failed (Retry available)</span>
+            </div>
           </div>
         </div>
       </div>
