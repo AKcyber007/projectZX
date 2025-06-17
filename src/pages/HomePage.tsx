@@ -219,6 +219,7 @@ const HomePage: React.FC = () => {
                   <ContractCard 
                     key={contract.id} 
                     {...contract}
+                    hideStatusTags={true} // Hide status tags on homepage
                     onClick={() => navigate('/marketplace')}
                   />
                 ))

@@ -21,6 +21,7 @@ interface ContractCardProps {
   docstatus?: 0 | 1 | 2;
   status?: 'active' | 'pending' | 'completed' | 'expired'; // Legacy support
   onClick?: () => void;
+  hideStatusTags?: boolean; // New prop to control status tag visibility
 }
 
 const ContractCard: React.FC<ContractCardProps> = ({
@@ -41,7 +42,8 @@ const ContractCard: React.FC<ContractCardProps> = ({
   postedDate,
   docstatus,
   status,
-  onClick
+  onClick,
+  hideStatusTags = false // Default to showing status tags for backward compatibility
 }) => {
   // Use Frappe fields with legacy fallbacks
   const displayTitle = item_name || title || '';
@@ -87,9 +89,12 @@ const ContractCard: React.FC<ContractCardProps> = ({
           <span className={`px-2 py-1 text-xs font-medium rounded-full ${typeColors[displayType]}`}>
             {displayType}
           </span>
-          <span className={`px-2 py-1 text-xs font-medium rounded-full ${statusDisplay.color}`}>
-            {statusDisplay.text}
-          </span>
+          {/* Only show status tags when hideStatusTags is false */}
+          {!hideStatusTags && (
+            <span className={`px-2 py-1 text-xs font-medium rounded-full ${statusDisplay.color}`}>
+              {statusDisplay.text}
+            </span>
+          )}
         </div>
       </div>
       

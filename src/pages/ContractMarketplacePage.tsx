@@ -198,63 +198,6 @@ const ContractMarketplacePage: React.FC = () => {
     cancelReservation(contractId);
   };
 
-  const getStatusColor = (docstatus: number) => {
-    switch (docstatus) {
-      case 0: return 'bg-yellow-100 text-yellow-800'; // Draft
-      case 1: return 'bg-green-100 text-green-800';   // Submitted
-      case 2: return 'bg-red-100 text-red-800';       // Cancelled
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const getStatusText = (docstatus: number) => {
-    switch (docstatus) {
-      case 0: return 'Draft';
-      case 1: return 'Submitted';
-      case 2: return 'Cancelled';
-      default: return 'Unknown';
-    }
-  };
-
-  const getExecutionStatusBadge = (contract: any) => {
-    if (!contract.execution_status || contract.execution_status === 'pending') {
-      return { color: 'bg-gray-100 text-gray-800', text: 'Pending', icon: Clock };
-    }
-    
-    switch (contract.execution_status) {
-      case 'ready_for_delivery':
-        return { color: 'bg-blue-100 text-blue-800', text: 'Ready for Delivery', icon: Package };
-      case 'delivered':
-        return { color: 'bg-purple-100 text-purple-800', text: 'Delivered', icon: CheckCircle };
-      case 'completed':
-        return { color: 'bg-green-100 text-green-800', text: 'Completed', icon: CheckCircle };
-      default:
-        return { color: 'bg-gray-100 text-gray-800', text: 'Pending', icon: Clock };
-    }
-  };
-
-  const getInvoiceStatusBadge = (contract: any) => {
-    if (!contract.invoice_generated) {
-      return null;
-    }
-
-    // Determine invoice status based on verification
-    let status = 'Draft';
-    let color = 'bg-gray-100 text-gray-800';
-
-    if (contract.execution_status === 'ready_for_delivery') {
-      status = 'Final';
-      color = 'bg-blue-100 text-blue-800';
-    }
-
-    if (contract.buyer_verified && contract.seller_verified) {
-      status = 'Verified';
-      color = 'bg-green-100 text-green-800';
-    }
-
-    return { color, text: `Invoice: ${status}` };
-  };
-
   // Helper function to show reservation amount only for future contracts
   const getReservationDisplay = (contract: any, userReservation: any) => {
     if (!userReservation) return null;
@@ -416,8 +359,6 @@ const ContractMarketplacePage: React.FC = () => {
                 const userReservation = getUserReservation(contract.id);
                 const hasReserved = hasUserReserved(contract.id);
                 const canViewInvoice = hasReserved && contract.invoice_generated && userReservation?.invoice_id;
-                const executionStatus = getExecutionStatusBadge(contract);
-                const invoiceStatus = getInvoiceStatusBadge(contract);
                 const isOwn = isOwnContract(contract);
                 const contractTypeTag = getContractTypeTag(contract);
                 const actionButtonText = getActionButtonText(contract);
@@ -528,48 +469,11 @@ const ContractMarketplacePage: React.FC = () => {
                       {/* Contract Footer */}
                       <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-3">
-                          {/* Document Status */}
-                          <div className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(contract.docstatus)}`}>
-                            {getStatusText(contract.docstatus)}
-                          </div>
-                          
-                          {/* Sync Status */}
-                          <div className={`px-2 py-1 rounded-full text-xs font-medium ${
-                            contract.sync_status === 'Synced' ? 'bg-green-100 text-green-800' :
-                            contract.sync_status === 'Sync Failed' ? 'bg-red-100 text-red-800' :
-                            'bg-gray-100 text-gray-800'
-                          }`}>
-                            {contract.sync_status}
-                          </div>
-
-                          {/* Execution Status */}
-                          <div className={`flex items-center space-x-1 px-2 py-1 rounded-full text-xs font-medium ${executionStatus.color}`}>
-                            <executionStatus.icon className="w-3 h-3" />
-                            <span>{executionStatus.text}</span>
-                          </div>
-
-                          {/* Invoice Status */}
-                          {invoiceStatus && (
-                            <div className={`px-2 py-1 rounded-full text-xs font-medium ${invoiceStatus.color}`}>
-                              {invoiceStatus.text}
-                            </div>
-                          )}
-
-                          {/* Verification Status */}
-                          {contract.invoice_generated && (
-                            <div className="flex items-center space-x-1">
-                              <div className={`flex items-center space-x-1 px-2 py-1 rounded-full text-xs font-medium ${
-                                contract.buyer_verified ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-                              }`}>
-                                {contract.buyer_verified ? <CheckCircle className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
-                                <span>Buyer</span>
-                              </div>
-                              <div className={`flex items-center space-x-1 px-2 py-1 rounded-full text-xs font-medium ${
-                                contract.seller_verified ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-                              }`}>
-                                {contract.seller_verified ? <CheckCircle className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
-                                <span>Seller</span>
-                              </div>
+                          {/* Basic availability info only - no internal status tags */}
+                          {contract.contract_type === 'Future' && contract.availability_date && (
+                            <div className="flex items-center space-x-1 text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded-full">
+                              <Calendar className="w-3 h-3" />
+                              <span>Available: {contract.availability_date}</span>
                             </div>
                           )}
                         </div>
