@@ -32,7 +32,7 @@ const ContractReservationDemoPage: React.FC = () => {
     postedDate: '2 hours ago',
     status: 'active' as const,
     availabilityDate: '2025-04-15',
-    reservationAmount: 45000,
+    reservationAmount: 45000, // 20% of total for future contracts
     customerName: 'John Doe (Your Company Ltd)',
     description: 'High-grade aluminum sheets suitable for aerospace and automotive applications. Premium quality with certified specifications and guaranteed delivery.'
   };
@@ -92,10 +92,10 @@ const ContractReservationDemoPage: React.FC = () => {
             <Crown className="w-6 h-6 text-yellow-600 mt-0.5" />
             <div>
               <h3 className="text-lg font-semibold text-yellow-800 mb-2">
-                Premium Required for Reservations
+                Premium Required for Future Contract Reservations
               </h3>
               <p className="text-yellow-700 mb-4">
-                Future contract reservations are available exclusively to Premium members. 
+                Future contract reservations with 20% advance payment are available exclusively to Premium members. 
                 Click "Reserve Now" to automatically upgrade and proceed with the demo.
               </p>
             </div>
@@ -227,10 +227,10 @@ const ContractReservationDemoPage: React.FC = () => {
                 <CheckCircle className="w-6 h-6 text-green-600 mt-0.5" />
                 <div>
                   <h3 className="text-lg font-semibold text-green-800 mb-2">
-                    Contract Successfully Reserved!
+                    Future Contract Successfully Reserved!
                   </h3>
                   <div className="space-y-2 text-green-700">
-                    <p>✓ Payment of ₹{sampleContract.reservationAmount.toLocaleString()} processed</p>
+                    <p>✓ Advance payment of ₹{sampleContract.reservationAmount.toLocaleString()} processed</p>
                     <p>✓ Draft invoice created in Frappe Books</p>
                     <p>✓ Contract reserved until {sampleContract.availabilityDate}</p>
                     <p>✓ Seller notified of reservation</p>
@@ -263,6 +263,7 @@ const ContractReservationDemoPage: React.FC = () => {
                 contractData={sampleContract}
                 invoiceNumber={invoiceNumber}
                 isReserved={isReserved}
+                isFutureContract={true}
               />
             </motion.div>
           ) : (
@@ -274,14 +275,14 @@ const ContractReservationDemoPage: React.FC = () => {
                 Waiting for Reservation
               </h3>
               <p className="text-gray-600 mb-4">
-                Once you reserve the contract, a draft invoice will be automatically generated in Frappe Books
+                Once you reserve the future contract, a draft invoice will be automatically generated in Frappe Books with 20% advance payment
               </p>
               <div className="bg-gray-50 rounded-lg p-4">
                 <h4 className="text-sm font-medium text-gray-700 mb-2">Integration Features:</h4>
                 <div className="space-y-1 text-sm text-gray-600">
                   <div className="flex items-center space-x-2">
                     <Shield className="w-3 h-3" />
-                    <span>Automatic invoice generation</span>
+                    <span>Automatic invoice generation with 20% advance</span>
                   </div>
                   <div className="flex items-center space-x-2">
                     <Shield className="w-3 h-3" />
@@ -304,24 +305,24 @@ const ContractReservationDemoPage: React.FC = () => {
 
       {/* Technical Notes */}
       <div className="bg-gray-50 rounded-xl p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Technical Implementation Notes</h3>
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Updated Payment Logic</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
-            <h4 className="text-sm font-medium text-gray-700 mb-2">Backend Integration</h4>
+            <h4 className="text-sm font-medium text-gray-700 mb-2">Future Contracts (Premium Only)</h4>
             <ul className="text-sm text-gray-600 space-y-1">
-              <li>• REST API endpoints for contract reservations</li>
-              <li>• Frappe Books API integration for invoice generation</li>
-              <li>• Payment gateway integration (Razorpay/Stripe)</li>
-              <li>• Real-time status updates via WebSocket</li>
+              <li>• 20% advance payment required for reservation</li>
+              <li>• Premium subscription required to access</li>
+              <li>• Remaining 80% due on availability date</li>
+              <li>• Cancellation forfeits advance payment</li>
             </ul>
           </div>
           <div>
-            <h4 className="text-sm font-medium text-gray-700 mb-2">Data Flow</h4>
+            <h4 className="text-sm font-medium text-gray-700 mb-2">Regular Contracts</h4>
             <ul className="text-sm text-gray-600 space-y-1">
-              <li>• Contract data → Payment processing</li>
-              <li>• Payment confirmation → Invoice creation</li>
-              <li>• Invoice sync → Frappe Books accounting</li>
-              <li>• Status updates → Real-time notifications</li>
+              <li>• No upfront payment required</li>
+              <li>• Full payment on completion/delivery</li>
+              <li>• Available to all users</li>
+              <li>• Immediate execution after agreement</li>
             </ul>
           </div>
         </div>

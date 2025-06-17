@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { X, Calculator, Users, AlertCircle, CheckCircle } from 'lucide-react';
+import { useUser } from '../contexts/UserContext';
 
 interface SplitReserveModalProps {
   isOpen: boolean;
@@ -22,6 +23,7 @@ const SplitReserveModal: React.FC<SplitReserveModalProps> = ({
   contract,
   onReserve
 }) => {
+  const { isPremium } = useUser();
   const [quantity, setQuantity] = useState(contract.minSplitQuantity);
   const [isProcessing, setIsProcessing] = useState(false);
 
@@ -29,8 +31,10 @@ const SplitReserveModal: React.FC<SplitReserveModalProps> = ({
 
   const availableQuantity = contract.quantity - contract.reservedQuantity;
   const totalPrice = quantity * contract.pricePerUnit;
-  const reservationAmount = Math.round(totalPrice * 0.2);
-  const remainingBalance = totalPrice - reservationAmount;
+  
+  // FIXED: No reservation amount for split contracts (they're not future contracts)
+  const reservationAmount = 0; // Split contracts don't require 20% upfront
+  const remainingBalance = totalPrice; // Full payment on completion
 
   const isValidQuantity = quantity >= contract.minSplitQuantity && 
                          quantity <= availableQuantity && 
@@ -143,12 +147,12 @@ const SplitReserveModal: React.FC<SplitReserveModalProps> = ({
                   <span className="font-medium">₹{totalPrice.toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Reservation (20%):</span>
-                  <span className="font-medium text-blue-600">₹{reservationAmount.toLocaleString()}</span>
+                  <span className="text-gray-600">Payment Required:</span>
+                  <span className="font-medium text-blue-600">₹0 (Pay on Completion)</span>
                 </div>
                 <div className="border-t border-blue-200 pt-2">
                   <div className="flex justify-between">
-                    <span className="text-gray-600">Remaining Balance:</span>
+                    <span className="text-gray-600">Amount Due on Delivery:</span>
                     <span className="font-medium">₹{remainingBalance.toLocaleString()}</span>
                   </div>
                 </div>
@@ -163,10 +167,10 @@ const SplitReserveModal: React.FC<SplitReserveModalProps> = ({
               <div className="text-xs text-yellow-700">
                 <p className="font-medium mb-1">Split Contract Terms:</p>
                 <ul className="space-y-1">
-                  <li>• 20% upfront payment required for reservation</li>
-                  <li>• Cancellation forfeits the reservation amount</li>
+                  <li>• No upfront payment required for split contracts</li>
+                  <li>• Full payment due on contract execution/delivery</li>
                   <li>• Delivery coordinated with other participants</li>
-                  <li>• Final payment due on contract execution date</li>
+                  <li>• Cancellation allowed before execution date</li>
                 </ul>
               </div>
             </div>
@@ -198,7 +202,7 @@ const SplitReserveModal: React.FC<SplitReserveModalProps> = ({
             ) : (
               <>
                 <CheckCircle className="w-4 h-4" />
-                <span>Reserve ₹{reservationAmount.toLocaleString()}</span>
+                <span>Reserve Contract</span>
               </>
             )}
           </button>

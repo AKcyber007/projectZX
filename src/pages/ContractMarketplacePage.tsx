@@ -115,7 +115,8 @@ const ContractMarketplacePage: React.FC = () => {
       return;
     }
 
-    if (!isPremium && contract.contract_type === 'Future') {
+    // Check premium requirement for future contracts
+    if (contract.contract_type === 'Future' && !isPremium) {
       navigate('/subscription');
       return;
     }
@@ -126,7 +127,7 @@ const ContractMarketplacePage: React.FC = () => {
       await reserveContract(contractId, contract.qty, {
         name: currentUserName,
         company: user.company
-      });
+      }, isPremium); // Pass isPremium to determine payment logic
 
       // Navigate to contract accounting to see the generated invoice
       setTimeout(() => {
@@ -174,7 +175,7 @@ const ContractMarketplacePage: React.FC = () => {
       await reserveContract(selectedContract.id, quantity, {
         name: currentUserName,
         company: user.company
-      });
+      }, isPremium); // Pass isPremium to determine payment logic
 
       // Update the contract with new reservation
       updateContract(selectedContract.id, {
@@ -254,6 +255,29 @@ const ContractMarketplacePage: React.FC = () => {
     return { color, text: `Invoice: ${status}` };
   };
 
+  // Helper function to show reservation amount only for future contracts
+  const getReservationDisplay = (contract: any, userReservation: any) => {
+    if (!userReservation) return null;
+    
+    // Only show reservation amount for future contracts
+    if (contract.contract_type === 'Future' && userReservation.reservation_amount > 0) {
+      return (
+        <div>
+          <span className="text-purple-600">Advance Paid:</span>
+          <div className="font-medium">₹{userReservation.reservation_amount.toLocaleString()}</div>
+        </div>
+      );
+    }
+    
+    // For regular contracts, show full amount or payment status
+    return (
+      <div>
+        <span className="text-purple-600">Payment:</span>
+        <div className="font-medium">Pay on Completion</div>
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
@@ -300,6 +324,23 @@ const ContractMarketplacePage: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Payment Logic Notice */}
+      <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
+        <div className="flex items-start space-x-3">
+          <AlertCircle className="w-6 h-6 text-blue-600 mt-0.5" />
+          <div>
+            <h3 className="text-lg font-semibold text-blue-800 mb-2">
+              Payment Logic Update
+            </h3>
+            <div className="text-blue-700 space-y-2">
+              <p><strong>✅ 20% Advance Payment:</strong> Only for Premium users reserving Future contracts</p>
+              <p><strong>💰 Regular Contracts:</strong> Full payment on completion (no upfront charges)</p>
+              <p><strong>🔄 Split Contracts:</strong> Premium feature with flexible payment terms</p>
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* Search and Filters */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
@@ -448,10 +489,7 @@ const ContractMarketplacePage: React.FC = () => {
                                   <span className="text-purple-600">Quantity:</span>
                                   <div className="font-medium">{userReservation.quantity.toLocaleString()}</div>
                                 </div>
-                                <div>
-                                  <span className="text-purple-600">Advance Paid:</span>
-                                  <div className="font-medium">₹{userReservation.reservation_amount.toLocaleString()}</div>
-                                </div>
+                                {getReservationDisplay(contract, userReservation)}
                                 <div>
                                   <span className="text-purple-600">Reserved On:</span>
                                   <div className="font-medium">{userReservation.reservation_date}</div>
@@ -619,7 +657,7 @@ const ContractMarketplacePage: React.FC = () => {
                         <div className="mt-3 pt-3 border-t border-gray-200">
                           <div className="text-xs text-gray-600">
                             Available: {contract.availability_date}
-                            {hasReserved && userReservation && (
+                            {hasReserved && userReservation && userReservation.reservation_amount > 0 && (
                               <span> • Reserved for: ₹{userReservation.reservation_amount.toLocaleString()}</span>
                             )}
                           </div>

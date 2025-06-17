@@ -20,12 +20,14 @@ interface FrappeInvoicePreviewProps {
   };
   invoiceNumber: string;
   isReserved: boolean;
+  isFutureContract?: boolean; // New prop to determine if this is a future contract
 }
 
 const FrappeInvoicePreview: React.FC<FrappeInvoicePreviewProps> = ({
   contractData,
   invoiceNumber,
-  isReserved
+  isReserved,
+  isFutureContract = false
 }) => {
   // Use Frappe fields with legacy fallbacks
   const itemName = contractData.item_name || contractData.title || '';
@@ -37,6 +39,10 @@ const FrappeInvoicePreview: React.FC<FrappeInvoicePreviewProps> = ({
   const availabilityDate = contractData.availability_date || contractData.availabilityDate || '';
   
   const currentDate = new Date().toLocaleDateString('en-IN');
+  
+  // FIXED: Only show reservation amount for future contracts
+  const actualReservationAmount = isFutureContract ? reservationAmount : 0;
+  const remainingAmount = rate - actualReservationAmount;
   
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
@@ -105,7 +111,9 @@ const FrappeInvoicePreview: React.FC<FrappeInvoicePreviewProps> = ({
                 <Package className="w-4 h-4 text-gray-400" />
                 <div>
                   <div className="text-sm font-medium text-gray-900">{itemName}</div>
-                  <div className="text-xs text-gray-600">Future Contract Reservation</div>
+                  <div className="text-xs text-gray-600">
+                    {isFutureContract ? 'Future Contract Reservation' : 'Contract Purchase'}
+                  </div>
                 </div>
               </div>
             </div>
@@ -132,16 +140,27 @@ const FrappeInvoicePreview: React.FC<FrappeInvoicePreviewProps> = ({
             <span className="text-gray-600">Total Contract Value:</span>
             <span className="text-gray-900">₹{rate.toLocaleString()}</span>
           </div>
-          <div className="flex justify-between text-sm">
-            <span className="text-gray-600">Advance Paid (20%):</span>
-            <span className="font-medium text-blue-600">₹{reservationAmount.toLocaleString()}</span>
-          </div>
-          <div className="border-t border-blue-200 pt-2">
-            <div className="flex justify-between text-sm font-medium">
-              <span className="text-gray-900">Remaining Balance:</span>
-              <span className="text-gray-900">₹{(rate - reservationAmount).toLocaleString()}</span>
+          {isFutureContract && actualReservationAmount > 0 ? (
+            <>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-600">Advance Paid (20%):</span>
+                <span className="font-medium text-blue-600">₹{actualReservationAmount.toLocaleString()}</span>
+              </div>
+              <div className="border-t border-blue-200 pt-2">
+                <div className="flex justify-between text-sm font-medium">
+                  <span className="text-gray-900">Remaining Balance:</span>
+                  <span className="text-gray-900">₹{remainingAmount.toLocaleString()}</span>
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="border-t border-blue-200 pt-2">
+              <div className="flex justify-between text-sm font-medium">
+                <span className="text-gray-900">Payment Due on Completion:</span>
+                <span className="text-gray-900">₹{rate.toLocaleString()}</span>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
 

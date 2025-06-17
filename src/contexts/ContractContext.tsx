@@ -45,6 +45,7 @@ export interface Contract {
       invoice_id: string;
       status: 'active' | 'cancelled';
       reservation_amount: number;
+      is_future_contract: boolean; // Track if this was a future contract reservation
     };
   };
 }
@@ -55,7 +56,7 @@ interface ContractContextType {
   updateContract: (id: string, updates: Partial<Contract>) => void;
   getContractById: (id: string) => Contract | undefined;
   syncToFrappeBooks: (id: string) => Promise<void>;
-  reserveContract: (contractId: string, quantity?: number, buyerInfo?: any) => Promise<string>; // Returns invoice ID
+  reserveContract: (contractId: string, quantity?: number, buyerInfo?: any, isPremiumUser?: boolean) => Promise<string>; // Returns invoice ID
   markContractReadyForDelivery: (contractId: string) => void;
   verifyContractExecution: (contractId: string, role: 'buyer' | 'seller') => void;
   cancelReservation: (contractId: string, userId?: string) => void;
@@ -110,7 +111,8 @@ export const ContractProvider: React.FC<ContractProviderProps> = ({ children }) 
           reservation_date: '2025-01-15',
           invoice_id: '1',
           status: 'active',
-          reservation_amount: 30000
+          reservation_amount: 0, // No reservation amount for regular sell contracts
+          is_future_contract: false
         }
       }
     },
@@ -144,7 +146,8 @@ export const ContractProvider: React.FC<ContractProviderProps> = ({ children }) 
           reservation_date: '2025-01-14',
           invoice_id: '2',
           status: 'active',
-          reservation_amount: 24000
+          reservation_amount: 0, // No reservation amount for regular split contracts
+          is_future_contract: false
         }
       }
     },
@@ -178,7 +181,7 @@ export const ContractProvider: React.FC<ContractProviderProps> = ({ children }) 
       docstatus: 1,
       sync_status: 'Synced',
       availability_date: '2025-03-20',
-      reservation_amount: 128000,
+      reservation_amount: 128000, // 20% of total for future contracts
       allow_partial_purchases: true,
       min_split_quantity: 1000,
       reserved_quantity: 3000,
@@ -251,7 +254,7 @@ export const ContractProvider: React.FC<ContractProviderProps> = ({ children }) 
     return reservation && reservation.status === 'active';
   };
 
-  const reserveContract = async (contractId: string, quantity?: number, buyerInfo?: any): Promise<string> => {
+  const reserveContract = async (contractId: string, quantity?: number, buyerInfo?: any, isPremiumUser: boolean = false): Promise<string> => {
     const contract = getContractById(contractId);
     if (!contract) throw new Error('Contract not found');
 
@@ -259,7 +262,11 @@ export const ContractProvider: React.FC<ContractProviderProps> = ({ children }) 
     const reservationQuantity = quantity || contract.qty || 0;
     const ratePerUnit = contract.rate_per_unit || (contract.qty ? contract.rate / contract.qty : contract.rate);
     const totalValue = reservationQuantity * ratePerUnit;
-    const reservationAmount = Math.round(totalValue * 0.2);
+    
+    // FIXED LOGIC: Only apply 20% reservation for Future contracts with Premium users
+    const isFutureContract = contract.contract_type === 'Future';
+    const shouldApplyReservationPayment = isFutureContract && isPremiumUser;
+    const reservationAmount = shouldApplyReservationPayment ? Math.round(totalValue * 0.2) : 0;
 
     // Generate invoice ID
     const invoiceId = `ci_${Date.now()}`;
@@ -271,7 +278,8 @@ export const ContractProvider: React.FC<ContractProviderProps> = ({ children }) 
       reservation_date: new Date().toISOString().split('T')[0],
       invoice_id: invoiceId,
       status: 'active' as const,
-      reservation_amount: reservationAmount
+      reservation_amount: reservationAmount,
+      is_future_contract: isFutureContract
     };
 
     updateContract(contractId, {
@@ -293,12 +301,23 @@ export const ContractProvider: React.FC<ContractProviderProps> = ({ children }) 
         invoiceId,
         contract,
         quantity: reservationQuantity,
-        buyerInfo: buyerInfo || { name: 'John Doe', company: 'Your Company Ltd' }
+        buyerInfo: buyerInfo || { name: 'John Doe', company: 'Your Company Ltd' },
+        isFutureContract,
+        reservationAmount
       }
     });
     window.dispatchEvent(event);
 
-    showToast('Contract reserved successfully! Invoice generated.', 'success');
+    // Show appropriate success message
+    if (shouldApplyReservationPayment) {
+      showToast(`Future contract reserved! ₹${reservationAmount.toLocaleString()} advance payment processed.`, 'success');
+    } else if (isFutureContract && !isPremiumUser) {
+      showToast('Upgrade to Premium required for future contract reservations!', 'error');
+      throw new Error('Premium subscription required for future contracts');
+    } else {
+      showToast('Contract reserved successfully! Invoice generated.', 'success');
+    }
+
     return invoiceId;
   };
 
@@ -321,7 +340,12 @@ export const ContractProvider: React.FC<ContractProviderProps> = ({ children }) 
       user_reservations: updatedReservations
     });
 
-    showToast('Reservation cancelled. Advance payment forfeited.', 'info');
+    // Show appropriate cancellation message
+    if (reservation.is_future_contract && reservation.reservation_amount > 0) {
+      showToast(`Future contract reservation cancelled. ₹${reservation.reservation_amount.toLocaleString()} advance payment forfeited.`, 'info');
+    } else {
+      showToast('Contract reservation cancelled.', 'info');
+    }
   };
 
   const markContractReadyForDelivery = (contractId: string) => {

@@ -22,6 +22,7 @@ export interface ContractInvoice {
   payment_status: 'Pending' | 'Advance Paid' | 'Fully Paid';
   gst_hsn_code?: string;
   can_sync_to_frappe: boolean; // New field to control sync availability
+  is_future_contract?: boolean; // Track if this is a future contract
 }
 
 export interface ContractPayment {
@@ -96,8 +97,8 @@ export const ContractAccountingProvider: React.FC<ContractAccountingProviderProp
       quantity: 2000,
       rate: 75,
       total_amount: 150000,
-      reservation_amount: 30000,
-      remaining_amount: 120000,
+      reservation_amount: 0, // No reservation for regular contracts
+      remaining_amount: 150000,
       status: 'Verified',
       created_date: '2025-01-15',
       due_date: '2025-02-15',
@@ -106,7 +107,8 @@ export const ContractAccountingProvider: React.FC<ContractAccountingProviderProp
       sync_status: 'Synced',
       payment_status: 'Fully Paid',
       gst_hsn_code: '7208.51',
-      can_sync_to_frappe: true
+      can_sync_to_frappe: true,
+      is_future_contract: false
     },
     {
       id: '2',
@@ -119,17 +121,18 @@ export const ContractAccountingProvider: React.FC<ContractAccountingProviderProp
       quantity: 1500,
       rate: 80,
       total_amount: 120000,
-      reservation_amount: 24000,
-      remaining_amount: 96000,
+      reservation_amount: 0, // No reservation for regular split contracts
+      remaining_amount: 120000,
       status: 'Final',
       created_date: '2025-01-14',
       due_date: '2025-02-14',
       buyer_verified: false,
       seller_verified: false,
       sync_status: 'Not Synced',
-      payment_status: 'Advance Paid',
+      payment_status: 'Pending',
       gst_hsn_code: '7604.10',
-      can_sync_to_frappe: false // Cannot sync until verified
+      can_sync_to_frappe: false,
+      is_future_contract: false
     },
     {
       id: '3',
@@ -142,7 +145,7 @@ export const ContractAccountingProvider: React.FC<ContractAccountingProviderProp
       quantity: 3000,
       rate: 80,
       total_amount: 240000,
-      reservation_amount: 48000,
+      reservation_amount: 48000, // 20% for future contracts
       remaining_amount: 192000,
       status: 'Draft',
       created_date: '2025-01-13',
@@ -150,9 +153,10 @@ export const ContractAccountingProvider: React.FC<ContractAccountingProviderProp
       buyer_verified: false,
       seller_verified: false,
       sync_status: 'Not Synced',
-      payment_status: 'Advance Paid',
+      payment_status: 'Advance Paid', // 20% paid for future contracts
       gst_hsn_code: '5201.00',
-      can_sync_to_frappe: false // Cannot sync until verified
+      can_sync_to_frappe: false,
+      is_future_contract: true
     }
   ]);
 
@@ -162,22 +166,9 @@ export const ContractAccountingProvider: React.FC<ContractAccountingProviderProp
       payment_no: 'CP-2025-001',
       invoice_id: '1',
       contract_id: '1',
-      amount: 30000,
-      payment_type: 'Advance',
-      payment_date: '2025-01-15',
-      payment_method: 'Bank Transfer',
-      status: 'Completed',
-      verified_by_buyer: true,
-      verified_by_seller: true
-    },
-    {
-      id: '2',
-      payment_no: 'CP-2025-002',
-      invoice_id: '1',
-      contract_id: '1',
-      amount: 120000,
+      amount: 150000, // Full payment for regular contracts
       payment_type: 'Final',
-      payment_date: '2025-01-20',
+      payment_date: '2025-01-15',
       payment_method: 'Bank Transfer',
       status: 'Completed',
       verified_by_buyer: true,
@@ -186,22 +177,9 @@ export const ContractAccountingProvider: React.FC<ContractAccountingProviderProp
     {
       id: '3',
       payment_no: 'CP-2025-003',
-      invoice_id: '2',
-      contract_id: '2',
-      amount: 24000,
-      payment_type: 'Advance',
-      payment_date: '2025-01-14',
-      payment_method: 'UPI',
-      status: 'Completed',
-      verified_by_buyer: true,
-      verified_by_seller: false
-    },
-    {
-      id: '4',
-      payment_no: 'CP-2025-004',
       invoice_id: '3',
       contract_id: '4',
-      amount: 48000,
+      amount: 48000, // 20% advance for future contracts
       payment_type: 'Advance',
       payment_date: '2025-01-13',
       payment_method: 'Bank Transfer',
@@ -283,13 +261,18 @@ export const ContractAccountingProvider: React.FC<ContractAccountingProviderProp
   // Listen for contract events from Contract Module
   useEffect(() => {
     const handleContractReserved = (event: CustomEvent) => {
-      const { contractId, invoiceId, contract, quantity, buyerInfo } = event.detail;
+      const { contractId, invoiceId, contract, quantity, buyerInfo, isFutureContract, reservationAmount } = event.detail;
       
-      // Calculate amounts
+      // Calculate amounts based on contract type
       const unitRate = contract.rate_per_unit || (contract.rate / (contract.qty || 1));
       const totalAmount = quantity * unitRate;
-      const reservationAmount = Math.round(totalAmount * 0.2);
-      const remainingAmount = totalAmount - reservationAmount;
+      
+      // FIXED: Only use reservation amount for future contracts
+      const actualReservationAmount = isFutureContract ? reservationAmount : 0;
+      const remainingAmount = totalAmount - actualReservationAmount;
+      
+      // Determine payment status based on contract type
+      const paymentStatus = isFutureContract && actualReservationAmount > 0 ? 'Advance Paid' : 'Pending';
 
       // Create new invoice with Draft status
       const newInvoice: ContractInvoice = {
@@ -303,43 +286,51 @@ export const ContractAccountingProvider: React.FC<ContractAccountingProviderProp
         quantity: quantity,
         rate: unitRate,
         total_amount: totalAmount,
-        reservation_amount: reservationAmount,
+        reservation_amount: actualReservationAmount,
         remaining_amount: remainingAmount,
-        status: 'Draft', // Always start as Draft
+        status: 'Draft',
         created_date: new Date().toISOString().split('T')[0],
         due_date: contract.availability_date || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
         buyer_verified: false,
         seller_verified: false,
         sync_status: 'Not Synced',
-        payment_status: 'Advance Paid', // 20% paid immediately
+        payment_status: paymentStatus,
         gst_hsn_code: contract.gst_hsn_code,
-        can_sync_to_frappe: false // Cannot sync until verified
+        can_sync_to_frappe: false,
+        is_future_contract: isFutureContract
       };
 
       setContractInvoices(prev => [newInvoice, ...prev]);
 
-      // Create advance payment record
-      const advancePayment: ContractPayment = {
-        id: `payment_${Date.now()}`,
-        payment_no: `CP-2025-${String(contractPayments.length + 1).padStart(3, '0')}`,
-        invoice_id: invoiceId,
-        contract_id: contractId,
-        amount: reservationAmount,
-        payment_type: 'Advance',
-        payment_date: new Date().toISOString().split('T')[0],
-        payment_method: 'Bank Transfer',
-        status: 'Completed',
-        verified_by_buyer: true,
-        verified_by_seller: false
-      };
+      // Create payment record only if there's an actual payment
+      if (actualReservationAmount > 0) {
+        const advancePayment: ContractPayment = {
+          id: `payment_${Date.now()}`,
+          payment_no: `CP-2025-${String(contractPayments.length + 1).padStart(3, '0')}`,
+          invoice_id: invoiceId,
+          contract_id: contractId,
+          amount: actualReservationAmount,
+          payment_type: 'Advance',
+          payment_date: new Date().toISOString().split('T')[0],
+          payment_method: 'Bank Transfer',
+          status: 'Completed',
+          verified_by_buyer: true,
+          verified_by_seller: false
+        };
 
-      setContractPayments(prev => [advancePayment, ...prev]);
+        setContractPayments(prev => [advancePayment, ...prev]);
+      }
 
       // Auto-add parties to the system
       addPartyIfNotExists(buyerInfo.company || buyerInfo.name, 'Buyer');
       addPartyIfNotExists(contract.posted_by, 'Seller');
 
-      showToast('Contract reserved! Draft invoice generated with advance payment recorded.', 'success');
+      // Show appropriate success message
+      if (isFutureContract && actualReservationAmount > 0) {
+        showToast(`Future contract reserved! Draft invoice generated with ₹${actualReservationAmount.toLocaleString()} advance payment.`, 'success');
+      } else {
+        showToast('Contract reserved! Draft invoice generated.', 'success');
+      }
     };
 
     const handleContractReadyForDelivery = (event: CustomEvent) => {
