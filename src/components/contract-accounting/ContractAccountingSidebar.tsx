@@ -8,7 +8,9 @@ import {
   CheckCircle,
   Settings,
   RefreshCw,
-  TrendingUp
+  TrendingUp,
+  ShoppingBag,
+  ShoppingCart
 } from 'lucide-react';
 
 const ContractAccountingSidebar: React.FC = () => {
@@ -22,10 +24,18 @@ const ContractAccountingSidebar: React.FC = () => {
       current: location.pathname === '/contract-accounting/dashboard'
     },
     {
-      name: 'Contract Invoices',
-      href: '/contract-accounting/invoices',
-      icon: FileText,
-      current: location.pathname === '/contract-accounting/invoices'
+      name: 'Sales Invoices',
+      href: '/contract-accounting/sales-invoices',
+      icon: ShoppingBag,
+      current: location.pathname === '/contract-accounting/sales-invoices',
+      description: 'You as seller'
+    },
+    {
+      name: 'Purchase Invoices',
+      href: '/contract-accounting/purchase-invoices',
+      icon: ShoppingCart,
+      current: location.pathname === '/contract-accounting/purchase-invoices',
+      description: 'You as buyer'
     },
     {
       name: 'Payments',
@@ -78,15 +88,20 @@ const ContractAccountingSidebar: React.FC = () => {
             key={item.name}
             to={item.href}
             className={({ isActive }) =>
-              `flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
+              `flex flex-col px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
                 isActive
                   ? 'bg-purple-100 text-purple-700 border-r-2 border-purple-600'
                   : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
               }`
             }
           >
-            <item.icon className="w-5 h-5 mr-3" />
-            {item.name}
+            <div className="flex items-center">
+              <item.icon className="w-5 h-5 mr-3" />
+              {item.name}
+            </div>
+            {item.description && (
+              <span className="text-xs text-gray-500 ml-8 mt-1">{item.description}</span>
+            )}
           </NavLink>
         ))}
       </nav>

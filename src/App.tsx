@@ -19,7 +19,8 @@ import RegisterPage from './pages/RegisterPage';
 
 // Contract Accounting Pages
 import ContractAccountingDashboard from './pages/contract-accounting/ContractAccountingDashboard';
-import ContractInvoices from './pages/contract-accounting/ContractInvoices';
+import ContractSalesInvoices from './pages/contract-accounting/ContractSalesInvoices';
+import ContractPurchaseInvoices from './pages/contract-accounting/ContractPurchaseInvoices';
 
 function App() {
   return (
@@ -38,7 +39,8 @@ function App() {
                     <ContractAccountingLayout>
                       <Routes>
                         <Route path="/dashboard" element={<ContractAccountingDashboard />} />
-                        <Route path="/invoices" element={<ContractInvoices />} />
+                        <Route path="/sales-invoices" element={<ContractSalesInvoices />} />
+                        <Route path="/purchase-invoices" element={<ContractPurchaseInvoices />} />
                       </Routes>
                     </ContractAccountingLayout>
                   } />

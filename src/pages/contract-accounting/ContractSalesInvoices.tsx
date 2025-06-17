@@ -14,16 +14,26 @@ import {
   RefreshCw,
   AlertTriangle,
   Lock,
-  Clock
+  Clock,
+  DollarSign,
+  User
 } from 'lucide-react';
 
-const ContractInvoices: React.FC = () => {
+const ContractSalesInvoices: React.FC = () => {
   const { contractInvoices, verifyExecution, syncToERP } = useContractAccounting();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [syncingInvoices, setSyncingInvoices] = useState<Set<string>>(new Set());
 
-  const filteredInvoices = contractInvoices.filter(invoice => {
+  // Current user - in real app, this would come from auth context
+  const currentUser = 'Steel Corp Ltd'; // This should be dynamic
+
+  // Filter invoices where current user is the seller
+  const salesInvoices = contractInvoices.filter(invoice => 
+    invoice.seller === currentUser || invoice.seller === 'You'
+  );
+
+  const filteredInvoices = salesInvoices.filter(invoice => {
     const matchesSearch = invoice.invoice_no.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          invoice.contract_title.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          invoice.buyer.toLowerCase().includes(searchTerm.toLowerCase());
@@ -59,18 +69,13 @@ const ContractInvoices: React.FC = () => {
     }
   };
 
-  const handleVerifyExecution = (invoiceId: string, role: 'buyer' | 'seller') => {
-    verifyExecution(invoiceId, role);
+  const handleVerifyExecution = (invoiceId: string) => {
+    verifyExecution(invoiceId, 'seller');
   };
 
   const handleSyncToERP = async (invoiceId: string) => {
     const invoice = contractInvoices.find(inv => inv.id === invoiceId);
-    if (!invoice) return;
-
-    // Check if invoice meets sync requirements
-    if (!canSyncToFrappe(invoice)) {
-      return;
-    }
+    if (!invoice || !canSyncToFrappe(invoice)) return;
 
     setSyncingInvoices(prev => new Set(prev).add(invoiceId));
     await syncToERP(invoiceId);
@@ -81,7 +86,6 @@ const ContractInvoices: React.FC = () => {
     });
   };
 
-  // Helper function to determine if invoice can sync to Frappe
   const canSyncToFrappe = (invoice: any): boolean => {
     return invoice.status === 'Verified' && 
            invoice.payment_status === 'Fully Paid' && 
@@ -144,49 +148,48 @@ const ContractInvoices: React.FC = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Contract Invoices</h1>
-          <p className="text-gray-600">Manage invoices generated from contract reservations</p>
+          <h1 className="text-2xl font-bold text-gray-900">Sales Invoices</h1>
+          <p className="text-gray-600">Manage invoices where you are the seller</p>
         </div>
-        <button className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center space-x-2">
+        <button className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center space-x-2">
           <Plus className="w-4 h-4" />
-          <span>Create Invoice</span>
+          <span>Create Sales Invoice</span>
         </button>
       </div>
 
-      {/* Status Flow Explanation */}
-      <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
-        <h3 className="text-lg font-semibold text-blue-800 mb-3">Invoice Status Flow & Frappe Sync Requirements</h3>
+      {/* Sales Invoice Flow Explanation */}
+      <div className="bg-green-50 border border-green-200 rounded-xl p-6">
+        <h3 className="text-lg font-semibold text-green-800 mb-3">Sales Invoice Flow (You as Seller)</h3>
         <div className="flex items-center space-x-4 text-sm mb-4">
           <div className="flex items-center space-x-2">
             <div className="w-3 h-3 bg-gray-400 rounded-full"></div>
             <span className="text-gray-700">Draft</span>
-            <span className="text-gray-500">(Reservation made)</span>
+            <span className="text-gray-500">(Buyer reserved)</span>
           </div>
           <span className="text-gray-400">→</span>
           <div className="flex items-center space-x-2">
             <div className="w-3 h-3 bg-blue-400 rounded-full"></div>
             <span className="text-gray-700">Final</span>
-            <span className="text-gray-500">(Ready for delivery)</span>
+            <span className="text-gray-500">(You mark ready)</span>
           </div>
           <span className="text-gray-400">→</span>
           <div className="flex items-center space-x-2">
             <div className="w-3 h-3 bg-green-400 rounded-full"></div>
             <span className="text-gray-700">Verified</span>
-            <span className="text-gray-500">(Both parties verified)</span>
+            <span className="text-gray-500">(Both parties verify)</span>
           </div>
           <span className="text-gray-400">→</span>
           <div className="flex items-center space-x-2">
             <RefreshCw className="w-3 h-3 text-purple-600" />
             <span className="text-gray-700">Frappe Sync</span>
-            <span className="text-gray-500">(ERP integration)</span>
           </div>
         </div>
-        <div className="bg-purple-50 border border-purple-200 rounded-lg p-3">
+        <div className="bg-green-100 border border-green-300 rounded-lg p-3">
           <div className="flex items-start space-x-2">
-            <Lock className="w-4 h-4 text-purple-600 mt-0.5" />
-            <div className="text-sm text-purple-700">
-              <strong>Frappe Sync Requirements:</strong> Invoices can only be synced after they are <strong>Verified</strong> by both buyer and seller, 
-              and payment is <strong>Fully Paid</strong>. This ensures data integrity and prevents premature ERP integration.
+            <DollarSign className="w-4 h-4 text-green-600 mt-0.5" />
+            <div className="text-sm text-green-700">
+              <strong>As a Seller:</strong> You receive payments from buyers. Mark contracts as ready for delivery when goods/services are prepared. 
+              Verify completion after successful delivery to enable Frappe Books sync.
             </div>
           </div>
         </div>
@@ -200,16 +203,16 @@ const ContractInvoices: React.FC = () => {
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
               <input
                 type="text"
-                placeholder="Search invoices..."
+                placeholder="Search sales invoices..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent w-64"
+                className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent w-64"
               />
             </div>
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
             >
               <option value="all">All Status</option>
               <option value="Draft">Draft</option>
@@ -232,38 +235,32 @@ const ContractInvoices: React.FC = () => {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-white rounded-lg border border-gray-200 p-4">
-          <div className="text-2xl font-bold text-gray-900">{contractInvoices.length}</div>
-          <div className="text-sm text-gray-600">Total Invoices</div>
+          <div className="text-2xl font-bold text-gray-900">{filteredInvoices.length}</div>
+          <div className="text-sm text-gray-600">Sales Invoices</div>
         </div>
         <div className="bg-white rounded-lg border border-gray-200 p-4">
           <div className="text-2xl font-bold text-green-600">
-            ₹{contractInvoices.reduce((sum, inv) => sum + inv.total_amount, 0).toLocaleString()}
+            ₹{filteredInvoices.reduce((sum, inv) => sum + inv.total_amount, 0).toLocaleString()}
           </div>
-          <div className="text-sm text-gray-600">Total Value</div>
-        </div>
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
-          <div className="text-2xl font-bold text-purple-600">
-            {contractInvoices.filter(inv => inv.status === 'Verified').length}
-          </div>
-          <div className="text-sm text-gray-600">Verified</div>
+          <div className="text-sm text-gray-600">Total Sales Value</div>
         </div>
         <div className="bg-white rounded-lg border border-gray-200 p-4">
           <div className="text-2xl font-bold text-blue-600">
-            {contractInvoices.filter(inv => inv.sync_status === 'Synced').length}
+            {filteredInvoices.filter(inv => inv.status === 'Verified').length}
+          </div>
+          <div className="text-sm text-gray-600">Verified Sales</div>
+        </div>
+        <div className="bg-white rounded-lg border border-gray-200 p-4">
+          <div className="text-2xl font-bold text-purple-600">
+            {filteredInvoices.filter(inv => inv.sync_status === 'Synced').length}
           </div>
           <div className="text-sm text-gray-600">Synced to Frappe</div>
         </div>
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
-          <div className="text-2xl font-bold text-yellow-600">
-            {contractInvoices.filter(inv => canSyncToFrappe(inv) && inv.sync_status !== 'Synced').length}
-          </div>
-          <div className="text-sm text-gray-600">Ready to Sync</div>
-        </div>
       </div>
 
-      {/* Invoices Table */}
+      {/* Sales Invoices Table */}
       <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
@@ -273,10 +270,7 @@ const ContractInvoices: React.FC = () => {
                   Invoice Details
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Contract
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Parties
+                  Contract & Buyer
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Amount
@@ -309,18 +303,17 @@ const ContractInvoices: React.FC = () => {
                     </td>
                     <td className="px-6 py-4">
                       <div className="text-sm text-gray-900">{invoice.contract_title}</div>
-                      <div className="text-xs text-gray-500">ID: {invoice.contract_id}</div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="text-sm text-gray-900">
-                        <div>Buyer: {invoice.buyer}</div>
-                        <div>Seller: {invoice.seller}</div>
+                      <div className="flex items-center space-x-1 text-xs text-gray-500">
+                        <User className="w-3 h-3" />
+                        <span>Buyer: {invoice.buyer}</span>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-medium text-gray-900">₹{invoice.total_amount.toLocaleString()}</div>
                       <div className="text-xs text-gray-500">
-                        Advance: ₹{invoice.reservation_amount.toLocaleString()}
+                        {invoice.reservation_amount > 0 && (
+                          <>Advance: ₹{invoice.reservation_amount.toLocaleString()}</>
+                        )}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -356,31 +349,23 @@ const ContractInvoices: React.FC = () => {
                           ) : (
                             <XCircle className="w-4 h-4 text-red-500" />
                           )}
-                          <span className="text-xs text-gray-600">Seller</span>
+                          <span className="text-xs text-gray-600">You</span>
                         </div>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <div className="flex items-center space-x-2">
-                        {/* Verification Buttons */}
-                        {invoice.status === 'Final' && !invoice.buyer_verified && (
-                          <button
-                            onClick={() => handleVerifyExecution(invoice.id, 'buyer')}
-                            className="text-green-600 hover:text-green-900 text-xs bg-green-50 px-2 py-1 rounded"
-                          >
-                            Verify as Buyer
-                          </button>
-                        )}
+                        {/* Seller Verification Button */}
                         {invoice.status === 'Final' && !invoice.seller_verified && (
                           <button
-                            onClick={() => handleVerifyExecution(invoice.id, 'seller')}
+                            onClick={() => handleVerifyExecution(invoice.id)}
                             className="text-green-600 hover:text-green-900 text-xs bg-green-50 px-2 py-1 rounded"
                           >
-                            Verify as Seller
+                            Verify & Close
                           </button>
                         )}
 
-                        {/* Sync Button - Only show if requirements are met or already synced/failed */}
+                        {/* Sync Button */}
                         <div className="relative group">
                           <button
                             onClick={() => handleSyncToERP(invoice.id)}
@@ -420,32 +405,25 @@ const ContractInvoices: React.FC = () => {
         {filteredInvoices.length === 0 && (
           <div className="text-center py-12">
             <FileText className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No invoices found</h3>
-            <p className="text-gray-600 mb-4">Contract invoices will appear here when contracts are reserved</p>
-            <button className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg font-medium transition-colors">
-              Create Invoice
+            <h3 className="text-lg font-medium text-gray-900 mb-2">No sales invoices found</h3>
+            <p className="text-gray-600 mb-4">Sales invoices will appear here when buyers reserve your contracts</p>
+            <button className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium transition-colors">
+              Post New Contract
             </button>
           </div>
         )}
       </div>
 
-      {/* Sync Requirements Notice */}
+      {/* Seller Actions Notice */}
       <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
         <div className="flex items-start space-x-2">
           <AlertTriangle className="w-5 h-5 text-yellow-600 mt-0.5" />
           <div>
-            <h4 className="text-sm font-medium text-yellow-800">Frappe Books Sync Requirements</h4>
+            <h4 className="text-sm font-medium text-yellow-800">Seller Action Required</h4>
             <p className="text-sm text-yellow-700 mt-1">
-              Invoices can only be synced to Frappe Books after they are <strong>Verified</strong> by both buyer and seller, 
-              and payment is <strong>Fully Paid</strong>. This ensures data integrity and prevents premature ERP integration.
+              As a seller, you need to verify contract completion after successful delivery. 
+              Only verified invoices with full payment can be synced to Frappe Books for final accounting.
             </p>
-            <div className="mt-2 text-xs text-yellow-600">
-              <strong>Sync Status Legend:</strong>
-              <span className="ml-2">🔒 Locked (Requirements not met)</span>
-              <span className="ml-2">✅ Synced (Successfully synced)</span>
-              <span className="ml-2">🔄 Ready (Can sync now)</span>
-              <span className="ml-2">❌ Failed (Retry available)</span>
-            </div>
           </div>
         </div>
       </div>
@@ -453,4 +431,4 @@ const ContractInvoices: React.FC = () => {
   );
 };
 
-export default ContractInvoices;
+export default ContractSalesInvoices;
