@@ -28,9 +28,10 @@ const ContractSalesInvoices: React.FC = () => {
   // Current user - in real app, this would come from auth context
   const currentUser = 'Steel Corp Ltd'; // This should be dynamic
 
-  // Filter invoices where current user is the seller
+  // Filter invoices where current user is the seller AND buyer has verified
   const salesInvoices = contractInvoices.filter(invoice => 
-    invoice.seller === currentUser || invoice.seller === 'You'
+    (invoice.seller === currentUser || invoice.seller === 'You') && 
+    invoice.buyer_verified === true // Only show after buyer verification
   );
 
   const filteredInvoices = salesInvoices.filter(invoice => {
@@ -69,7 +70,7 @@ const ContractSalesInvoices: React.FC = () => {
     }
   };
 
-  const handleVerifyExecution = (invoiceId: string) => {
+  const handleVerifyAndClose = (invoiceId: string) => {
     verifyExecution(invoiceId, 'seller');
   };
 
@@ -91,6 +92,12 @@ const ContractSalesInvoices: React.FC = () => {
            invoice.payment_status === 'Fully Paid' && 
            invoice.buyer_verified && 
            invoice.seller_verified;
+  };
+
+  const canVerifyAndClose = (invoice: any): boolean => {
+    return invoice.buyer_verified === true && 
+           invoice.payment_status === 'Fully Paid' && 
+           invoice.seller_verified === false;
   };
 
   const getSyncButtonState = (invoice: any) => {
@@ -170,13 +177,13 @@ const ContractSalesInvoices: React.FC = () => {
           <div className="flex items-center space-x-2">
             <div className="w-3 h-3 bg-blue-400 rounded-full"></div>
             <span className="text-gray-700">Final</span>
-            <span className="text-gray-500">(You mark ready)</span>
+            <span className="text-gray-500">(Buyer completed)</span>
           </div>
           <span className="text-gray-400">→</span>
           <div className="flex items-center space-x-2">
             <div className="w-3 h-3 bg-green-400 rounded-full"></div>
             <span className="text-gray-700">Verified</span>
-            <span className="text-gray-500">(Both parties verify)</span>
+            <span className="text-gray-500">(You verify & close)</span>
           </div>
           <span className="text-gray-400">→</span>
           <div className="flex items-center space-x-2">
@@ -188,8 +195,8 @@ const ContractSalesInvoices: React.FC = () => {
           <div className="flex items-start space-x-2">
             <DollarSign className="w-4 h-4 text-green-600 mt-0.5" />
             <div className="text-sm text-green-700">
-              <strong>As a Seller:</strong> You receive payments from buyers. Mark contracts as ready for delivery when goods/services are prepared. 
-              Verify completion after successful delivery to enable Frappe Books sync.
+              <strong>As a Seller:</strong> You receive payments from buyers. Verify and close contracts after buyer completion. 
+              Only verified invoices with full payment can be synced to Frappe Books for final accounting.
             </div>
           </div>
         </div>
@@ -215,7 +222,6 @@ const ContractSalesInvoices: React.FC = () => {
               className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
             >
               <option value="all">All Status</option>
-              <option value="Draft">Draft</option>
               <option value="Final">Final</option>
               <option value="Verified">Verified</option>
               <option value="Cancelled">Cancelled</option>
@@ -279,9 +285,6 @@ const ContractSalesInvoices: React.FC = () => {
                   Status
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Verification
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Actions
                 </th>
               </tr>
@@ -331,38 +334,53 @@ const ContractSalesInvoices: React.FC = () => {
                             {invoice.sync_status}
                           </span>
                         </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center space-x-2">
-                        <div className="flex items-center space-x-1">
-                          {invoice.buyer_verified ? (
-                            <CheckCircle className="w-4 h-4 text-green-500" />
-                          ) : (
-                            <XCircle className="w-4 h-4 text-red-500" />
-                          )}
-                          <span className="text-xs text-gray-600">Buyer</span>
-                        </div>
-                        <div className="flex items-center space-x-1">
-                          {invoice.seller_verified ? (
-                            <CheckCircle className="w-4 h-4 text-green-500" />
-                          ) : (
-                            <XCircle className="w-4 h-4 text-red-500" />
-                          )}
-                          <span className="text-xs text-gray-600">You</span>
+                        <div className="flex items-center space-x-2">
+                          <div className="flex items-center space-x-1">
+                            {invoice.buyer_verified ? (
+                              <CheckCircle className="w-3 h-3 text-green-500" />
+                            ) : (
+                              <XCircle className="w-3 h-3 text-red-500" />
+                            )}
+                            <span className="text-xs text-gray-600">Buyer</span>
+                          </div>
+                          <div className="flex items-center space-x-1">
+                            {invoice.seller_verified ? (
+                              <CheckCircle className="w-3 h-3 text-green-500" />
+                            ) : (
+                              <XCircle className="w-3 h-3 text-red-500" />
+                            )}
+                            <span className="text-xs text-gray-600">You</span>
+                          </div>
                         </div>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <div className="flex items-center space-x-2">
-                        {/* Seller Verification Button */}
-                        {invoice.status === 'Final' && !invoice.seller_verified && (
+                        {/* Verify & Close Button */}
+                        {canVerifyAndClose(invoice) && (
                           <button
-                            onClick={() => handleVerifyExecution(invoice.id)}
-                            className="text-green-600 hover:text-green-900 text-xs bg-green-50 px-2 py-1 rounded"
+                            onClick={() => handleVerifyAndClose(invoice.id)}
+                            className="flex items-center space-x-1 text-green-600 hover:text-green-900 text-xs bg-green-50 px-2 py-1 rounded"
                           >
-                            Verify & Close
+                            <CheckCircle className="w-3 h-3" />
+                            <span>Verify & Close</span>
                           </button>
+                        )}
+
+                        {/* Contract Closed Badge */}
+                        {invoice.seller_verified && (
+                          <div className="flex items-center space-x-1 text-green-600 text-xs bg-green-50 px-2 py-1 rounded">
+                            <CheckCircle className="w-3 h-3" />
+                            <span>✅ Contract Closed</span>
+                          </div>
+                        )}
+
+                        {/* Awaiting Buyer Action */}
+                        {!invoice.buyer_verified && (
+                          <div className="flex items-center space-x-1 text-orange-600 text-xs bg-orange-50 px-2 py-1 rounded">
+                            <Clock className="w-3 h-3" />
+                            <span>Awaiting Buyer Action</span>
+                          </div>
                         )}
 
                         {/* Sync Button */}
@@ -406,7 +424,7 @@ const ContractSalesInvoices: React.FC = () => {
           <div className="text-center py-12">
             <FileText className="w-12 h-12 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">No sales invoices found</h3>
-            <p className="text-gray-600 mb-4">Sales invoices will appear here when buyers reserve your contracts</p>
+            <p className="text-gray-600 mb-4">Sales invoices will appear here after buyers complete their contracts</p>
             <button className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium transition-colors">
               Post New Contract
             </button>
@@ -421,7 +439,7 @@ const ContractSalesInvoices: React.FC = () => {
           <div>
             <h4 className="text-sm font-medium text-yellow-800">Seller Action Required</h4>
             <p className="text-sm text-yellow-700 mt-1">
-              As a seller, you need to verify contract completion after successful delivery. 
+              As a seller, you can only verify contracts after buyers have completed them. 
               Only verified invoices with full payment can be synced to Frappe Books for final accounting.
             </p>
           </div>

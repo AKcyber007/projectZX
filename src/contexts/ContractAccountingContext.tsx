@@ -126,10 +126,10 @@ export const ContractAccountingProvider: React.FC<ContractAccountingProviderProp
       status: 'Final',
       created_date: '2025-01-14',
       due_date: '2025-02-14',
-      buyer_verified: false,
-      seller_verified: false,
+      buyer_verified: true, // Buyer has completed
+      seller_verified: false, // Seller needs to verify
       sync_status: 'Not Synced',
-      payment_status: 'Pending',
+      payment_status: 'Fully Paid',
       gst_hsn_code: '7604.10',
       can_sync_to_frappe: false,
       is_future_contract: false
@@ -157,6 +157,30 @@ export const ContractAccountingProvider: React.FC<ContractAccountingProviderProp
       gst_hsn_code: '5201.00',
       can_sync_to_frappe: false,
       is_future_contract: true
+    },
+    {
+      id: '4',
+      invoice_no: 'CI-2025-004',
+      contract_id: '5',
+      contract_title: 'Electronic Components - Bulk Order',
+      buyer: 'MetalWorks Industries',
+      seller: 'TechSource Ltd',
+      item_name: 'Electronic Components',
+      quantity: 500,
+      rate: 150,
+      total_amount: 75000,
+      reservation_amount: 0,
+      remaining_amount: 75000,
+      status: 'Draft',
+      created_date: '2025-01-16',
+      due_date: '2025-02-16',
+      buyer_verified: false,
+      seller_verified: false,
+      sync_status: 'Not Synced',
+      payment_status: 'Pending',
+      gst_hsn_code: '8534.00',
+      can_sync_to_frappe: false,
+      is_future_contract: false
     }
   ]);
 
@@ -294,7 +318,7 @@ export const ContractAccountingProvider: React.FC<ContractAccountingProviderProp
         buyer_verified: false,
         seller_verified: false,
         sync_status: 'Not Synced',
-        payment_status: paymentStatus,
+        payment_status: paymentStatus as any,
         gst_hsn_code: contract.gst_hsn_code,
         can_sync_to_frappe: false,
         is_future_contract: isFutureContract
@@ -402,7 +426,12 @@ export const ContractAccountingProvider: React.FC<ContractAccountingProviderProp
   const updateInvoiceStatus = (id: string, status: string) => {
     setContractInvoices(prev => prev.map(invoice => {
       if (invoice.id === id) {
-        const updated = { ...invoice, status: status as any };
+        const updated = { 
+          ...invoice, 
+          status: status as any,
+          // When buyer marks as completed, set buyer_verified to true and status to Final
+          ...(status === 'Final' && { buyer_verified: true })
+        };
         updated.can_sync_to_frappe = canSyncToFrappe(updated);
         return updated;
       }
@@ -418,6 +447,11 @@ export const ContractAccountingProvider: React.FC<ContractAccountingProviderProp
           ...invoice,
           [role === 'buyer' ? 'buyer_verified' : 'seller_verified']: true
         };
+        
+        // If buyer is verifying, set status to Final
+        if (role === 'buyer') {
+          updated.status = 'Final';
+        }
         
         // If both parties have verified, update status to Verified
         if (updated.buyer_verified && updated.seller_verified) {
@@ -437,6 +471,8 @@ export const ContractAccountingProvider: React.FC<ContractAccountingProviderProp
     
     if (fullyVerified) {
       showToast('Contract fully verified! Invoice can now be synced to Frappe Books.', 'success');
+    } else if (role === 'buyer') {
+      showToast('Contract marked as completed. Seller has been notified for verification.', 'success');
     } else {
       showToast(`Contract execution verified by ${role}. Waiting for other party verification.`, 'info');
     }

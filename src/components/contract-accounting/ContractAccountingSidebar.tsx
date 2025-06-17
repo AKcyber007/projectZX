@@ -10,7 +10,8 @@ import {
   RefreshCw,
   TrendingUp,
   ShoppingBag,
-  ShoppingCart
+  ShoppingCart,
+  Edit
 } from 'lucide-react';
 
 const ContractAccountingSidebar: React.FC = () => {
@@ -24,11 +25,11 @@ const ContractAccountingSidebar: React.FC = () => {
       current: location.pathname === '/contract-accounting/dashboard'
     },
     {
-      name: 'Sales Invoices',
-      href: '/contract-accounting/sales-invoices',
-      icon: ShoppingBag,
-      current: location.pathname === '/contract-accounting/sales-invoices',
-      description: 'You as seller'
+      name: 'Drafts',
+      href: '/contract-accounting/drafts',
+      icon: Edit,
+      current: location.pathname === '/contract-accounting/drafts',
+      description: 'Reserved contracts'
     },
     {
       name: 'Purchase Invoices',
@@ -36,6 +37,13 @@ const ContractAccountingSidebar: React.FC = () => {
       icon: ShoppingCart,
       current: location.pathname === '/contract-accounting/purchase-invoices',
       description: 'You as buyer'
+    },
+    {
+      name: 'Sales Invoices',
+      href: '/contract-accounting/sales-invoices',
+      icon: ShoppingBag,
+      current: location.pathname === '/contract-accounting/sales-invoices',
+      description: 'You as seller'
     },
     {
       name: 'Payments',

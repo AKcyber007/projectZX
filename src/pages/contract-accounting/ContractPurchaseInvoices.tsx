@@ -16,13 +16,16 @@ import {
   DollarSign,
   User,
   Truck,
-  Package
+  Package,
+  CreditCard
 } from 'lucide-react';
 
 const ContractPurchaseInvoices: React.FC = () => {
-  const { contractInvoices, verifyExecution } = useContractAccounting();
+  const { contractInvoices, verifyExecution, showToast } = useContractAccounting();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [processingPayments, setProcessingPayments] = useState<Set<string>>(new Set());
+  const [completingContracts, setCompletingContracts] = useState<Set<string>>(new Set());
 
   // Current user - in real app, this would come from auth context
   const currentUser = 'MetalWorks Industries'; // This should be dynamic
@@ -82,8 +85,48 @@ const ContractPurchaseInvoices: React.FC = () => {
     return 'Pending';
   };
 
-  const handleVerifyExecution = (invoiceId: string) => {
-    verifyExecution(invoiceId, 'buyer');
+  const handleMakePayment = async (invoiceId: string) => {
+    const invoice = contractInvoices.find(inv => inv.id === invoiceId);
+    if (!invoice) return;
+
+    setProcessingPayments(prev => new Set(prev).add(invoiceId));
+    
+    try {
+      // Simulate payment processing
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      showToast(`Payment of ₹${invoice.remaining_amount.toLocaleString()} processed successfully!`, 'success');
+    } catch (error) {
+      showToast('Payment processing failed. Please try again.', 'error');
+    } finally {
+      setProcessingPayments(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(invoiceId);
+        return newSet;
+      });
+    }
+  };
+
+  const handleMarkCompleted = async (invoiceId: string) => {
+    setCompletingContracts(prev => new Set(prev).add(invoiceId));
+    
+    try {
+      // Simulate completion processing
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      // Mark buyer as verified and update status to Final
+      verifyExecution(invoiceId, 'buyer');
+      
+      showToast('Contract marked as completed. Seller has been notified for verification.', 'success');
+    } catch (error) {
+      showToast('Failed to mark contract as completed. Please try again.', 'error');
+    } finally {
+      setCompletingContracts(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(invoiceId);
+        return newSet;
+      });
+    }
   };
 
   const getRemainingPayment = (invoice: any) => {
@@ -117,25 +160,25 @@ const ContractPurchaseInvoices: React.FC = () => {
           <div className="flex items-center space-x-2">
             <div className="w-3 h-3 bg-blue-400 rounded-full"></div>
             <span className="text-gray-700">Final</span>
-            <span className="text-gray-500">(Seller ready)</span>
+            <span className="text-gray-500">(You complete)</span>
           </div>
           <span className="text-gray-400">→</span>
           <div className="flex items-center space-x-2">
             <div className="w-3 h-3 bg-green-400 rounded-full"></div>
             <span className="text-gray-700">Verified</span>
-            <span className="text-gray-500">(You confirm delivery)</span>
+            <span className="text-gray-500">(Seller confirms)</span>
           </div>
           <span className="text-gray-400">→</span>
           <div className="flex items-center space-x-2">
             <DollarSign className="w-3 h-3 text-green-600" />
-            <span className="text-gray-700">Payment Due</span>
+            <span className="text-gray-700">Payment Complete</span>
           </div>
         </div>
         <div className="bg-blue-100 border border-blue-300 rounded-lg p-3">
           <div className="flex items-start space-x-2">
             <Package className="w-4 h-4 text-blue-600 mt-0.5" />
             <div className="text-sm text-blue-700">
-              <strong>As a Buyer:</strong> You make payments to sellers. Confirm delivery receipt to complete the transaction. 
+              <strong>As a Buyer:</strong> You drive the contract lifecycle. Make payments, confirm delivery receipt, and mark contracts as completed. 
               Future contracts require 20% upfront payment, while regular contracts are paid on completion.
             </div>
           </div>
@@ -226,9 +269,6 @@ const ContractPurchaseInvoices: React.FC = () => {
                   Status
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Delivery Status
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Actions
                 </th>
               </tr>
@@ -281,13 +321,6 @@ const ContractPurchaseInvoices: React.FC = () => {
                             {invoice.payment_status}
                           </span>
                         </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="space-y-2">
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getDeliveryStatusColor(invoice.status, invoice.buyer_verified, invoice.seller_verified)}`}>
-                          {getDeliveryStatusText(invoice.status, invoice.buyer_verified, invoice.seller_verified)}
-                        </span>
                         <div className="flex items-center space-x-2">
                           <div className="flex items-center space-x-1">
                             {invoice.buyer_verified ? (
@@ -310,30 +343,68 @@ const ContractPurchaseInvoices: React.FC = () => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <div className="flex items-center space-x-2">
-                        {/* Buyer Verification Button */}
-                        {invoice.status === 'Final' && !invoice.buyer_verified && (
-                          <button
-                            onClick={() => handleVerifyExecution(invoice.id)}
-                            className="flex items-center space-x-1 text-green-600 hover:text-green-900 text-xs bg-green-50 px-2 py-1 rounded"
-                          >
-                            <CheckCircle className="w-3 h-3" />
-                            <span>Confirm Delivery</span>
-                          </button>
+                        {/* Draft Status Actions */}
+                        {invoice.status === 'Draft' && (
+                          <>
+                            <button
+                              onClick={() => handleMakePayment(invoice.id)}
+                              disabled={processingPayments.has(invoice.id)}
+                              className={`flex items-center space-x-1 text-xs px-2 py-1 rounded transition-colors ${
+                                processingPayments.has(invoice.id)
+                                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                  : 'bg-blue-600 hover:bg-blue-700 text-white'
+                              }`}
+                            >
+                              {processingPayments.has(invoice.id) ? (
+                                <>
+                                  <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
+                                  <span>Processing...</span>
+                                </>
+                              ) : (
+                                <>
+                                  <CreditCard className="w-3 h-3" />
+                                  <span>Make Payment</span>
+                                </>
+                              )}
+                            </button>
+
+                            <button
+                              onClick={() => handleMarkCompleted(invoice.id)}
+                              disabled={completingContracts.has(invoice.id)}
+                              className={`flex items-center space-x-1 text-xs px-2 py-1 rounded transition-colors ${
+                                completingContracts.has(invoice.id)
+                                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                  : 'bg-green-600 hover:bg-green-700 text-white'
+                              }`}
+                            >
+                              {completingContracts.has(invoice.id) ? (
+                                <>
+                                  <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
+                                  <span>Completing...</span>
+                                </>
+                              ) : (
+                                <>
+                                  <CheckCircle className="w-3 h-3" />
+                                  <span>Mark Completed</span>
+                                </>
+                              )}
+                            </button>
+                          </>
                         )}
 
-                        {/* Payment Status Indicator */}
-                        {invoice.status === 'Verified' && remainingPayment > 0 && (
-                          <div className="flex items-center space-x-1 text-red-600 text-xs bg-red-50 px-2 py-1 rounded">
-                            <DollarSign className="w-3 h-3" />
-                            <span>Payment Due</span>
+                        {/* Final Status - Waiting for Seller */}
+                        {invoice.status === 'Final' && !invoice.seller_verified && (
+                          <div className="flex items-center space-x-1 text-orange-600 text-xs bg-orange-50 px-2 py-1 rounded">
+                            <Clock className="w-3 h-3" />
+                            <span>Awaiting Seller Verification</span>
                           </div>
                         )}
 
-                        {/* Completed Indicator */}
-                        {invoice.buyer_verified && invoice.seller_verified && (
+                        {/* Verified Status */}
+                        {invoice.status === 'Verified' && (
                           <div className="flex items-center space-x-1 text-green-600 text-xs bg-green-50 px-2 py-1 rounded">
                             <CheckCircle className="w-3 h-3" />
-                            <span>Completed</span>
+                            <span>Contract Completed</span>
                           </div>
                         )}
 
@@ -371,8 +442,8 @@ const ContractPurchaseInvoices: React.FC = () => {
           <div>
             <h4 className="text-sm font-medium text-yellow-800">Buyer Action Required</h4>
             <p className="text-sm text-yellow-700 mt-1">
-              As a buyer, confirm delivery receipt to complete transactions. For future contracts, you've already paid 20% upfront. 
-              Remaining payment is due upon delivery confirmation.
+              As a buyer, you drive the contract lifecycle. Make payments and mark contracts as completed after delivery. 
+              For future contracts, you've already paid 20% upfront. Remaining payment is due upon completion.
             </p>
           </div>
         </div>
