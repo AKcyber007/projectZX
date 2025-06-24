@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, ReactNode } from 'react';
+import { useUser } from './UserContext';
 
 export interface Contract {
   id: string;

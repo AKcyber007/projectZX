@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useContractAccounting } from '../../contexts/ContractAccountingContext';
+import { useUser } from '../../contexts/UserContext';
 import { 
   Plus, 
   Search, 
@@ -22,13 +23,14 @@ import {
 
 const ContractPurchaseInvoices: React.FC = () => {
   const { contractInvoices, verifyExecution, showToast } = useContractAccounting();
+  const { user } = useUser();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [processingPayments, setProcessingPayments] = useState<Set<string>>(new Set());
   const [completingContracts, setCompletingContracts] = useState<Set<string>>(new Set());
 
-  // Current user - in real app, this would come from auth context
-  const currentUser = 'MetalWorks Industries'; // This should be dynamic
+  // Use authenticated user's company name from UserContext
+  const currentUser = user.company;
 
   // Filter invoices where current user is the buyer
   const purchaseInvoices = contractInvoices.filter(invoice => 

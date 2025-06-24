@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
+import { useUser } from './UserContext';
 
 export interface ContractInvoice {
   id: string;
@@ -82,6 +83,7 @@ interface ContractAccountingProviderProps {
 }
 
 export const ContractAccountingProvider: React.FC<ContractAccountingProviderProps> = ({ children }) => {
+  const { user } = useUser();
   const [toast, setToast] = useState<{ message: string; type: string; show: boolean } | null>(null);
 
   // Sample contract invoices data with updated status logic
@@ -91,7 +93,7 @@ export const ContractAccountingProvider: React.FC<ContractAccountingProviderProp
       invoice_no: 'CI-2025-001',
       contract_id: '1',
       contract_title: 'Premium Steel Sheets - Industrial Grade',
-      buyer: 'MetalWorks Industries',
+      buyer: user.company,
       seller: 'Steel Corp Ltd',
       item_name: 'Premium Steel Sheets',
       quantity: 2000,
@@ -163,7 +165,7 @@ export const ContractAccountingProvider: React.FC<ContractAccountingProviderProp
       invoice_no: 'CI-2025-004',
       contract_id: '5',
       contract_title: 'Electronic Components - Bulk Order',
-      buyer: 'MetalWorks Industries',
+      buyer: user.company,
       seller: 'TechSource Ltd',
       item_name: 'Electronic Components',
       quantity: 500,
@@ -216,10 +218,10 @@ export const ContractAccountingProvider: React.FC<ContractAccountingProviderProp
   const [contractParties, setContractParties] = useState<ContractParty[]>([
     {
       id: '1',
-      name: 'MetalWorks Industries',
-      email: 'contact@metalworks.com',
+      name: user.company,
+      email: user.email || 'contact@yourcompany.com',
       phone: '+91 98765 43210',
-      company: 'MetalWorks Industries',
+      company: user.company,
       role: 'Buyer',
       total_contracts: 5,
       total_value: 750000,
@@ -323,6 +325,9 @@ export const ContractAccountingProvider: React.FC<ContractAccountingProviderProp
         can_sync_to_frappe: false,
         is_future_contract: isFutureContract
       };
+
+      // Add debug logging
+      console.log('New Draft Invoice:', newInvoice);
 
       setContractInvoices(prev => [newInvoice, ...prev]);
 
