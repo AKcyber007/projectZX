@@ -34,7 +34,7 @@ const ContractAccountingDashboard: React.FC = () => {
     { status: 'Verified', count: 8, color: '#10b981' },
     { status: 'Pending Buyer', count: 3, color: '#f59e0b' },
     { status: 'Pending Seller', count: 2, color: '#ef4444' },
-    { status: 'Draft', count: 4, color: '#6b7280' }
+    { status: 'Final', count: 4, color: '#6b7280' }
   ];
 
   const statCards = [

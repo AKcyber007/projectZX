@@ -10,8 +10,7 @@ import {
   RefreshCw,
   TrendingUp,
   ShoppingBag,
-  ShoppingCart,
-  Edit
+  ShoppingCart
 } from 'lucide-react';
 
 const ContractAccountingSidebar: React.FC = () => {
@@ -23,13 +22,6 @@ const ContractAccountingSidebar: React.FC = () => {
       href: '/contract-accounting/dashboard',
       icon: BarChart3,
       current: location.pathname === '/contract-accounting/dashboard'
-    },
-    {
-      name: 'Drafts',
-      href: '/contract-accounting/drafts',
-      icon: Edit,
-      current: location.pathname === '/contract-accounting/drafts',
-      description: 'Reserved contracts'
     },
     {
       name: 'Purchase Invoices',
